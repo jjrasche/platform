@@ -6,7 +6,7 @@ Adding a new app to the platform.
 
 - App repo has a `frontend/Dockerfile` that produces a static site
 - App has Supabase migrations in `supabase/migrations/`
-- DNS wildcard `*.jmr.fyi` points at VPS (or add a specific A record)
+- DNS A record for the tenant's domain points at VPS IP
 
 ## Steps
 
@@ -23,8 +23,8 @@ Adding a new app to the platform.
 
 3. **Add Caddy route** — append to Caddyfile:
    ```
-   newapp.jmr.fyi {
-       reverse_proxy frontend-newapp:3001
+   newapp.example.com {
+       reverse_proxy frontend-newapp:3004
    }
    ```
 
@@ -34,7 +34,7 @@ Adding a new app to the platform.
      build:
        context: /opt/apps/newapp/frontend
        args:
-         VITE_SUPABASE_URL: "https://api.jmr.fyi"
+         VITE_SUPABASE_URL: "https://api.jimr.fyi"
          VITE_SUPABASE_ANON_KEY: "${ANON_KEY}"
      restart: unless-stopped
    ```
@@ -47,5 +47,5 @@ Adding a new app to the platform.
 
 6. **Verify**
    ```bash
-   curl -s https://newapp.jmr.fyi | head -5
+   curl -s https://newapp.example.com | head -5
    ```

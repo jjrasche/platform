@@ -22,19 +22,19 @@ Single Hetzner VPS running all personal projects. Shared Supabase backend, indep
     └────┬────┘ └───┬───┘ └───┬────┘
          │          │          │
     Routes to:   Contains:   Dumps to:
-    *.jmr.fyi    Kong         Hetzner
-                 Postgres     Object
-    house.*      GoTrue       Storage
-    practice.*   Realtime
-    mrt.*        Studio
+    jimr.fyi     Kong         Hetzner
+    practice.    Postgres     Object
+    exchange     GoTrue       Storage
+                 Realtime
+                 Studio
 ```
 
 ## Request Flow
 
-1. User hits `https://house.jmr.fyi`
+1. User hits `https://house.jimr.fyi`
 2. Caddy terminates TLS (Let's Encrypt auto-provisioned)
-3. Request routes to `frontend-houseops` container (static files)
-4. Frontend JS calls `https://api.jmr.fyi/rest/v1/*`
+3. Request routes to `frontend-house-ops` container (static files)
+4. Frontend JS calls `https://api.jimr.fyi/rest/v1/*`
 5. Caddy routes API calls to Kong (Supabase gateway)
 6. Kong validates JWT, forwards to Postgres
 
@@ -85,16 +85,15 @@ Webhook → GitHub Action
 
 ## DNS Layout
 
-All under `jmr.fyi` domain:
+Two domains, one VPS IP:
 
-| Record | Type | Value |
-|---|---|---|
-| `house.jmr.fyi` | A | VPS IP |
-| `practice.jmr.fyi` | A | VPS IP |
-| `mrt.jmr.fyi` | A | VPS IP |
-| `api.jmr.fyi` | A | VPS IP |
+| Record | Type | Value | Notes |
+|---|---|---|---|
+| `jimr.fyi` | A | VPS IP | Supabase Studio |
+| `*.jimr.fyi` | A | VPS IP | Covers house, mrt, api subdomains |
+| `practice.exchange` | A | VPS IP | Standalone domain |
 
-Or use a wildcard: `*.jmr.fyi` → VPS IP (one record covers everything).
+Wildcard `*.jimr.fyi` covers `house.jimr.fyi`, `mrt.jimr.fyi`, and `api.jimr.fyi`. `practice.exchange` requires its own A record at its registrar.
 
 ## Security
 

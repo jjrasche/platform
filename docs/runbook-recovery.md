@@ -13,7 +13,8 @@ Note the new IP address from output.
 
 ### 2. Update DNS
 If not using Hetzner DNS (which Terraform manages):
-- Update `*.jmr.fyi` A record to new VPS IP in Namecheap
+- Update `*.jimr.fyi` A record to new VPS IP
+- Update `practice.exchange` A record to new VPS IP
 
 ### 3. Provision
 ```bash
@@ -32,8 +33,9 @@ ansible-playbook -i inventory playbook.yml
 
 ### 5. Verify
 ```bash
-curl -s https://house.jmr.fyi | head -5
-curl -s https://api.jmr.fyi/rest/v1/ -H "apikey: $ANON_KEY"
+curl -s https://house.jimr.fyi | head -5
+curl -s https://practice.exchange | head -5
+curl -s https://api.jimr.fyi/rest/v1/ -H "apikey: $ANON_KEY"
 ```
 
 ## Automated Recovery (when implemented)

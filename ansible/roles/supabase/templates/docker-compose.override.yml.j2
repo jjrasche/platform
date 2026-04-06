@@ -4,7 +4,7 @@ services:
     build:
       context: "{{ apps_dir }}/{{ tenant.repo }}/frontend"
       args:
-        VITE_SUPABASE_URL: "https://api.{{ domain }}"
+        VITE_SUPABASE_URL: "https://{{ supabase_api_domain }}"
         VITE_SUPABASE_ANON_KEY: "{{ vault_anon_key }}"
         VITE_DEEPGRAM_API_KEY: "{{ vault_deepgram_api_key }}"
     restart: unless-stopped

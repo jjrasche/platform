@@ -1,6 +1,6 @@
-# jmr-platform
+# platform
 
-Personal infrastructure platform. One Hetzner VPS running shared Supabase + per-app frontends behind Caddy with automatic HTTPS. All tenants (house-ops, practice-exchange, mrt) deploy here.
+Personal hosting platform. One Hetzner VPS running shared Supabase + per-app frontends behind Caddy with automatic HTTPS. Each tenant has its own domain (subdomain of jimr.fyi or standalone like practice.exchange).
 
 ## Stack
 - Provisioning: Terraform (Hetzner Cloud) + Ansible
@@ -38,11 +38,11 @@ Phone/Laptop → Caddy (HTTPS) → Frontend containers (one per app)
 ### Tenants
 Each tenant is an app repo with its own `frontend/Dockerfile`. This repo handles where and how they run.
 
-| App | Repo | Subdomain | Database |
+| App | Repo | Domain | Database |
 |---|---|---|---|
-| HouseOps | house-ops | house.jmr.fyi | house_ops |
-| Practice Exchange | practice-exchange | practice.jmr.fyi | practice_exchange |
-| MRT | mrt-spring-2026 | mrt.jmr.fyi | mrt |
+| HouseOps | house-ops | house.jimr.fyi | house_ops |
+| Practice Exchange | practice-exchange | practice.exchange | practice_exchange |
+| MRT | mrt-spring-2026 | mrt.jimr.fyi | mrt |
 
 ### Secrets
 Ansible Vault encrypts all secrets. Never committed in plaintext.

@@ -1,10 +1,10 @@
 {% for tenant in tenants %}
-{{ tenant.subdomain }}.{{ domain }} {
+{{ tenant.domain }} {
     reverse_proxy frontend-{{ tenant.name }}:{{ tenant.port }}
 }
 
 {% endfor %}
-api.{{ domain }} {
+{{ supabase_api_domain }} {
     handle /rest/v1/* {
         reverse_proxy kong:8000
     }
@@ -26,8 +26,10 @@ api.{{ domain }} {
     }
 }
 
-{{ domain }} {
-    handle /* {
-        reverse_proxy studio:3000
+{{ supabase_studio_domain }} {
+    basicauth {
+        # Add hashed credentials via: caddy hash-password
+        {{ vault_studio_user }} {{ vault_studio_password_hash }}
     }
+    reverse_proxy studio:3000
 }

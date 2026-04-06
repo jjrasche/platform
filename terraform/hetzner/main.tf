@@ -18,12 +18,12 @@ provider "hcloud" {
 # --- VPS ---
 
 resource "hcloud_ssh_key" "deploy" {
-  name       = "jmr-platform-deploy"
-  public_key = file("~/.ssh/id_jmr_platform.pub")
+  name       = "platform-deploy"
+  public_key = file("~/.ssh/id_platform.pub")
 }
 
 resource "hcloud_firewall" "platform" {
-  name = "jmr-platform"
+  name = "platform"
 
   rule {
     direction = "in"
@@ -48,7 +48,7 @@ resource "hcloud_firewall" "platform" {
 }
 
 resource "hcloud_server" "platform" {
-  name        = "jmr-platform"
+  name        = "platform"
   server_type = "cx22"
   image       = "ubuntu-24.04"
   location    = "ash"

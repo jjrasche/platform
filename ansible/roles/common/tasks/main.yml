@@ -51,7 +51,7 @@
 
 - name: Create daily backup cron
   cron:
-    name: "jmr-platform-backup"
+    name: "platform-backup"
     hour: "3"
     minute: "0"
-    job: "{{ apps_dir }}/scripts/backup.sh >> /var/log/jmr-backup.log 2>&1"
+    job: "{{ apps_dir }}/scripts/backup.sh >> /var/log/platform-backup.log 2>&1"

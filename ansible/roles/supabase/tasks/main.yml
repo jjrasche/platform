@@ -48,12 +48,10 @@
 
 - name: Create tenant databases
   shell: |
-    PGPASSWORD="{{ vault_postgres_password }}" psql \
-      -h localhost -p 5432 -U postgres -tc \
+    docker exec supabase-db psql -U supabase_admin -d postgres -tc \
       "SELECT 1 FROM pg_database WHERE datname = '{{ item.database }}'" \
       | grep -q 1 || \
-    PGPASSWORD="{{ vault_postgres_password }}" psql \
-      -h localhost -p 5432 -U postgres -c \
+    docker exec supabase-db psql -U supabase_admin -d postgres -c \
       "CREATE DATABASE {{ item.database }}"
   loop: "{{ tenants }}"
   changed_when: false

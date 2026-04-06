@@ -34,6 +34,18 @@ services:
   kong:
     ports: !reset []
 
+  studio:
+    depends_on: !override
+      db:
+        condition: service_healthy
+
+  storage:
+    depends_on: !override
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+
   analytics:
     profiles:
       - disabled

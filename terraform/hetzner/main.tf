@@ -49,7 +49,7 @@ resource "hcloud_firewall" "platform" {
 
 resource "hcloud_server" "platform" {
   name        = "platform"
-  server_type = "cx22"
+  server_type = "cpx11"
   image       = "ubuntu-24.04"
   location    = "ash"
   ssh_keys    = [hcloud_ssh_key.deploy.id]

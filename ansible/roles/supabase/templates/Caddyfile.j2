@@ -27,8 +27,7 @@
 }
 
 {{ supabase_studio_domain }} {
-    basicauth {
-        # Add hashed credentials via: caddy hash-password
+    basic_auth {
         {{ vault_studio_user }} {{ vault_studio_password_hash }}
     }
     reverse_proxy studio:3000

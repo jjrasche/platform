@@ -1,5 +1,24 @@
 ---
-# Common server setup: Docker, Caddy, backup cron, firewall
+# Common server setup: deploy user, Docker, Caddy, backup cron
+
+- name: Create deploy user
+  user:
+    name: deploy
+    shell: /bin/bash
+    groups: sudo
+    append: true
+    create_home: true
+
+- name: Allow deploy user passwordless sudo
+  copy:
+    content: "deploy ALL=(ALL) NOPASSWD:ALL\n"
+    dest: /etc/sudoers.d/deploy
+    mode: "0440"
+
+- name: Add SSH key for deploy user
+  authorized_key:
+    user: deploy
+    key: "{{ lookup('file', '~/.ssh/id_platform.pub') }}"
 
 - name: Update apt cache
   apt:
@@ -42,6 +61,12 @@
     name: docker
     state: started
     enabled: true
+
+- name: Add deploy user to docker group
+  user:
+    name: deploy
+    groups: docker
+    append: true
 
 - name: Create backup directory
   file:

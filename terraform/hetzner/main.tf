@@ -49,9 +49,9 @@ resource "hcloud_firewall" "platform" {
 
 resource "hcloud_server" "platform" {
   name        = "platform"
-  server_type = "cpx11"
+  server_type = "cax21"
   image       = "ubuntu-24.04"
-  location    = "ash"
+  location    = "fsn1"
   ssh_keys    = [hcloud_ssh_key.deploy.id]
   firewall_ids = [hcloud_firewall.platform.id]
 }

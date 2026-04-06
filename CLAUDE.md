@@ -42,7 +42,7 @@ Each tenant is an app repo with its own `frontend/Dockerfile`. This repo handles
 |---|---|---|---|
 | HouseOps | house-ops | house.jimr.fyi | house_ops |
 | Practice Exchange | practice-exchange | practice.exchange | practice_exchange |
-| MRT | mrt-spring-2026 | mrt.jimr.fyi | mrt |
+| Event Planner | event-planner | hike.jimr.fyi | event_planner |
 
 ### Secrets
 Ansible Vault encrypts all secrets. Never committed in plaintext.

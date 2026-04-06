@@ -1,0 +1,9 @@
+---
+- name: Provision JMR Platform
+  hosts: platform
+  become: true
+
+  roles:
+    - common
+    - supabase
+    - frontend

@@ -1,0 +1,6 @@
+vault.yml
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+*.retry

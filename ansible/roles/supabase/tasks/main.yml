@@ -1,0 +1,59 @@
+---
+# Deploy shared Supabase stack
+
+- name: Clone Supabase repo
+  git:
+    repo: https://github.com/supabase/supabase.git
+    dest: "{{ supabase_dir }}"
+    depth: 1
+    version: master
+    force: true
+
+- name: Template Supabase .env
+  template:
+    src: env.j2
+    dest: "{{ supabase_dir }}/docker/.env"
+    mode: "0600"
+
+- name: Template docker-compose.override.yml
+  template:
+    src: docker-compose.override.yml.j2
+    dest: "{{ supabase_dir }}/docker/docker-compose.override.yml"
+    mode: "0644"
+
+- name: Create Caddy config directory
+  file:
+    path: "{{ supabase_dir }}/docker/volumes/caddy"
+    state: directory
+    mode: "0755"
+
+- name: Template Caddyfile
+  template:
+    src: Caddyfile.j2
+    dest: "{{ supabase_dir }}/docker/volumes/caddy/Caddyfile"
+    mode: "0644"
+
+- name: Start Supabase stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ supabase_dir }}/docker"
+    state: present
+    pull: always
+
+- name: Wait for Postgres
+  wait_for:
+    host: localhost
+    port: 5432
+    delay: 5
+    timeout: 60
+
+- name: Create tenant databases
+  shell: |
+    PGPASSWORD="{{ vault_postgres_password }}" psql \
+      -h localhost -p 5432 -U postgres -tc \
+      "SELECT 1 FROM pg_database WHERE datname = '{{ item.database }}'" \
+      | grep -q 1 || \
+    PGPASSWORD="{{ vault_postgres_password }}" psql \
+      -h localhost -p 5432 -U postgres -c \
+      "CREATE DATABASE {{ item.database }}"
+  loop: "{{ tenants }}"
+  changed_when: false

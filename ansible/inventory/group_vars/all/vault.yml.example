@@ -1,0 +1,13 @@
+---
+# Copy to vault.yml, fill in values, encrypt with:
+#   ansible-vault encrypt ansible/inventory/group_vars/all/vault.yml
+
+vault_postgres_password: "CHANGE_ME"
+vault_jwt_secret: "CHANGE_ME_min_32_chars"
+vault_anon_key: "CHANGE_ME_generated_jwt"
+vault_service_role_key: "CHANGE_ME_generated_jwt"
+vault_dashboard_username: "admin"
+vault_dashboard_password: "CHANGE_ME"
+vault_deepgram_api_key: "CHANGE_ME"
+vault_groq_api_key: "CHANGE_ME"
+vault_hcloud_token: "CHANGE_ME"

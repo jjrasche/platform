@@ -1,0 +1,33 @@
+{% for tenant in tenants %}
+{{ tenant.subdomain }}.{{ domain }} {
+    reverse_proxy frontend-{{ tenant.name }}:{{ tenant.port }}
+}
+
+{% endfor %}
+api.{{ domain }} {
+    handle /rest/v1/* {
+        reverse_proxy kong:8000
+    }
+
+    handle /auth/v1/* {
+        reverse_proxy kong:8000
+    }
+
+    handle /realtime/v1/* {
+        reverse_proxy kong:8000
+    }
+
+    handle /storage/v1/* {
+        reverse_proxy kong:8000
+    }
+
+    handle /functions/v1/* {
+        reverse_proxy kong:8000
+    }
+}
+
+{{ domain }} {
+    handle /* {
+        reverse_proxy studio:3000
+    }
+}

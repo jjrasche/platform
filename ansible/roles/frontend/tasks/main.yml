@@ -1,0 +1,26 @@
+---
+# Copy frontend source for each tenant app
+
+- name: Create apps directory
+  file:
+    path: "{{ apps_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Create tenant app directories
+  file:
+    path: "{{ apps_dir }}/{{ item.repo }}/frontend"
+    state: directory
+    mode: "0755"
+  loop: "{{ tenants }}"
+
+- name: Sync tenant frontend source
+  synchronize:
+    src: "{{ playbook_dir }}/../../{{ item.repo }}/frontend/"
+    dest: "{{ apps_dir }}/{{ item.repo }}/frontend/"
+    delete: true
+    rsync_opts:
+      - "--exclude=node_modules"
+      - "--exclude=dist"
+      - "--exclude=.vercel"
+  loop: "{{ tenants }}"

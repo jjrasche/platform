@@ -1,0 +1,51 @@
+services:
+{% for tenant in tenants %}
+  frontend-{{ tenant.name }}:
+    build:
+      context: "{{ apps_dir }}/{{ tenant.repo }}/frontend"
+      args:
+        VITE_SUPABASE_URL: "https://api.{{ domain }}"
+        VITE_SUPABASE_ANON_KEY: "{{ vault_anon_key }}"
+        VITE_DEEPGRAM_API_KEY: "{{ vault_deepgram_api_key }}"
+    restart: unless-stopped
+    networks:
+      - default
+
+{% endfor %}
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./volumes/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - kong
+{% for tenant in tenants %}
+      - frontend-{{ tenant.name }}
+{% endfor %}
+    networks:
+      - default
+
+  kong:
+    ports: !reset []
+
+  analytics:
+    profiles:
+      - disabled
+
+  vector:
+    profiles:
+      - disabled
+
+  imgproxy:
+    profiles:
+      - disabled
+
+volumes:
+  caddy_data:
+  caddy_config:

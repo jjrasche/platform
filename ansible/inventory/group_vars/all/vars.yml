@@ -16,16 +16,13 @@ tenants:
     domain: house.jimr.fyi
     database: house_ops
     repo: house-ops
-    port: 3001
 
   - name: practice-exchange
     domain: practice.exchange
     database: practice_exchange
     repo: practice-exchange
-    port: 3002
 
-  - name: mrt
-    domain: mrt.jimr.fyi
-    database: mrt
-    repo: mrt-spring-2026
-    port: 3003
+  - name: event-planner
+    domain: hike.jimr.fyi
+    database: event_planner
+    repo: event-planner

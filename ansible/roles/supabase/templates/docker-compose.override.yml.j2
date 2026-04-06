@@ -1,12 +1,7 @@
 services:
 {% for tenant in tenants %}
   frontend-{{ tenant.name }}:
-    build:
-      context: "{{ apps_dir }}/{{ tenant.repo }}/frontend"
-      args:
-        VITE_SUPABASE_URL: "https://{{ supabase_api_domain }}"
-        VITE_SUPABASE_ANON_KEY: "{{ vault_anon_key }}"
-        VITE_DEEPGRAM_API_KEY: "{{ vault_deepgram_api_key }}"
+    image: ghcr.io/jjrasche/{{ tenant.repo }}:latest
     restart: unless-stopped
     networks:
       - default

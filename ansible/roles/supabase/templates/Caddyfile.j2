@@ -1,6 +1,6 @@
 {% for tenant in tenants %}
 {{ tenant.domain }} {
-    reverse_proxy frontend-{{ tenant.name }}:{{ tenant.port }}
+    reverse_proxy frontend-{{ tenant.name }}:80
 }
 
 {% endfor %}

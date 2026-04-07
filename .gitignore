@@ -1,4 +1,5 @@
-vault.yml
+# vault.yml is encrypted via ansible-vault — safe to commit
+# vault.yml.example is already tracked as a template
 *.tfstate
 *.tfstate.backup
 .terraform/

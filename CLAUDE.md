@@ -5,6 +5,7 @@ Personal hosting platform. One Hetzner VPS running shared Supabase + per-app fro
 ## Stack
 - Provisioning: Terraform (Hetzner Cloud) + Ansible
 - Runtime: Docker Compose
+- CDN/DNS: Cloudflare (proxied, Full strict TLS)
 - Reverse proxy: Caddy (auto HTTPS via Let's Encrypt)
 - Database: Supabase self-hosted (shared Postgres, per-tenant databases)
 - Backups: pg_dump to Hetzner Object Storage
@@ -20,11 +21,7 @@ cd ansible && ansible-playbook -i inventory playbook.yml  # Provision + deploy
 
 ## Architecture
 
-```
-Phone/Laptop → Caddy (HTTPS) → Frontend containers (one per app)
-                              → Supabase (Kong → Postgres, Auth, Realtime, Storage)
-                              → Backups → Hetzner Object Storage
-```
+See `docs/platform-architecture.drawio` (and `.png` export) for full topology.
 
 ### Key Directories
 - `terraform/hetzner/` — VPS, object storage bucket, firewall rules

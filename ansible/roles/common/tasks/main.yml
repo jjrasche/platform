@@ -9,7 +9,7 @@
     append: true
     create_home: true
 
-- name: Allow deploy user passwordless sudo for docker
+- name: Allow deploy user passwordless sudo
   copy:
     content: "deploy ALL=(ALL) NOPASSWD: ALL\n"
     dest: /etc/sudoers.d/deploy

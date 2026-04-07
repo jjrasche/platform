@@ -33,11 +33,18 @@
     dest: "{{ supabase_dir }}/docker/volumes/caddy/Caddyfile"
     mode: "0644"
 
+- name: Login to GHCR
+  community.docker.docker_login:
+    registry: ghcr.io
+    username: jjrasche
+    password: "{{ vault_ghcr_token }}"
+  when: vault_ghcr_token is defined and vault_ghcr_token != "CHANGE_ME"
+
 - name: Start Supabase stack
   community.docker.docker_compose_v2:
     project_src: "{{ supabase_dir }}/docker"
     state: present
-    pull: always
+    pull: "{{ 'always' if (vault_ghcr_token is defined and vault_ghcr_token != 'CHANGE_ME') else 'missing' }}"
 
 - name: Wait for Postgres
   wait_for:

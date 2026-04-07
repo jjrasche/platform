@@ -11,7 +11,7 @@
 
 - name: Allow deploy user passwordless sudo for docker
   copy:
-    content: "deploy ALL=(ALL) NOPASSWD: /usr/bin/docker, /usr/bin/docker compose *\n"
+    content: "deploy ALL=(ALL) NOPASSWD: ALL\n"
     dest: /etc/sudoers.d/deploy
     mode: "0440"
 
@@ -80,3 +80,28 @@
     hour: "3"
     minute: "0"
     job: "{{ apps_dir }}/scripts/backup.sh >> /var/log/platform-backup.log 2>&1"
+
+- name: Install fail2ban
+  apt:
+    name: fail2ban
+    state: present
+
+- name: Configure fail2ban SSH jail
+  copy:
+    content: |
+      [sshd]
+      enabled = true
+      port = 22
+      filter = sshd
+      maxretry = 5
+      bantime = 3600
+      findtime = 600
+    dest: /etc/fail2ban/jail.d/sshd.conf
+    mode: "0644"
+  notify: restart fail2ban
+
+- name: Start and enable fail2ban
+  systemd:
+    name: fail2ban
+    state: started
+    enabled: true

@@ -1,0 +1,249 @@
+<mxfile host="app.diagrams.net" modified="2026-04-06" agent="Claude Code" version="24.0.0" type="device">
+  <diagram id="platform-arch" name="Platform Architecture">
+    <mxGraphModel dx="1500" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Internet / Users -->
+        <mxCell id="users" value="Users" style="shape=mxgraph.cisco.people.standing_man;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="720" y="20" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="internet" value="Internet" style="ellipse;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="80" width="120" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_users_internet" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#666666;" edge="1" parent="1" source="users" target="internet">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+
+        <!-- Cloudflare -->
+        <mxCell id="cloudflare" value="Cloudflare&#xa;DDoS · WAF · CDN&#xa;Proxied DNS" style="rounded=1;whiteSpace=wrap;fillColor=#e6ecf0;strokeColor=#4472C4;fontColor=#333333;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="650" y="140" width="180" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_internet_cf" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#4472C4;strokeWidth=2;" edge="1" parent="1" source="internet" target="cloudflare">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+
+        <!-- Hetzner Cloud boundary -->
+        <mxCell id="hetzner" value="Hetzner Cloud" style="swimlane;startSize=28;fillColor=none;strokeColor=#666666;fontColor=#333333;fontSize=14;fontStyle=1;rounded=1;arcSize=8;recursiveResize=0;" vertex="1" parent="1">
+          <mxGeometry x="200" y="240" width="1080" height="820" as="geometry"/>
+        </mxCell>
+
+        <!-- Firewall -->
+        <mxCell id="firewall" value="Firewall&#xa;Ports: 22, 80, 443" style="shape=mxgraph.cisco.firewalls.firewall;fillColor=#f0e6d2;strokeColor=#c4a35a;fontColor=#333333;fontSize=11;labelPosition=right;verticalLabelPosition=middle;align=left;verticalAlign=middle;" vertex="1" parent="hetzner">
+          <mxGeometry x="470" y="30" width="50" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- VPS boundary -->
+        <mxCell id="vps" value="VPS — cax21 ARM (4 vCPU / 8 GB) — Falkenstein&#xa;Ubuntu 24.04 · Docker Compose · fail2ban" style="swimlane;startSize=40;fillColor=none;strokeColor=#9673a6;fontColor=#333333;fontSize=12;fontStyle=1;rounded=1;arcSize=6;recursiveResize=0;" vertex="1" parent="hetzner">
+          <mxGeometry x="40" y="100" width="1000" height="680" as="geometry"/>
+        </mxCell>
+
+        <!-- Caddy -->
+        <mxCell id="caddy" value="Caddy 2&#xa;TLS termination (Let's Encrypt)&#xa;Trusts CF-Connecting-IP&#xa;:80 / :443" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#333333;fontSize=11;fontStyle=1;" vertex="1" parent="vps">
+          <mxGeometry x="350" y="20" width="260" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- Frontend containers group -->
+        <mxCell id="frontends" value="Frontend Containers (static files via nginx)" style="swimlane;startSize=24;fillColor=none;strokeColor=#9673a6;fontColor=#9673a6;fontSize=11;fontStyle=2;rounded=1;arcSize=10;recursiveResize=0;" vertex="1" parent="vps">
+          <mxGeometry x="40" y="130" width="420" height="130" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fe_house" value="frontend-house-ops&#xa;house.jimr.fyi&#xa;:80" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#333333;fontSize=10;" vertex="1" parent="frontends">
+          <mxGeometry x="10" y="30" width="125" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="fe_practice" value="frontend-practice-exchange&#xa;practice.exchange&#xa;:80" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#333333;fontSize=10;" vertex="1" parent="frontends">
+          <mxGeometry x="145" y="30" width="135" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="fe_event" value="frontend-event-planner&#xa;hike.jimr.fyi&#xa;:80" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#333333;fontSize=10;" vertex="1" parent="frontends">
+          <mxGeometry x="290" y="30" width="120" height="90" as="geometry"/>
+        </mxCell>
+
+        <!-- Supabase stack group -->
+        <mxCell id="supabase" value="Supabase Stack (shared)" style="swimlane;startSize=24;fillColor=none;strokeColor=#82b366;fontColor=#82b366;fontSize=11;fontStyle=3;rounded=1;arcSize=10;recursiveResize=0;" vertex="1" parent="vps">
+          <mxGeometry x="40" y="300" width="920" height="360" as="geometry"/>
+        </mxCell>
+
+        <!-- Kong -->
+        <mxCell id="kong" value="Kong&#xa;API Gateway&#xa;:8000" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#333333;fontSize=11;fontStyle=1;" vertex="1" parent="supabase">
+          <mxGeometry x="370" y="30" width="130" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- GoTrue -->
+        <mxCell id="gotrue" value="GoTrue&#xa;Auth (IdP)" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#333333;fontSize=11;" vertex="1" parent="supabase">
+          <mxGeometry x="30" y="130" width="100" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- PostgREST -->
+        <mxCell id="postgrest" value="PostgREST&#xa;REST API" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#333333;fontSize=11;" vertex="1" parent="supabase">
+          <mxGeometry x="160" y="130" width="100" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Realtime -->
+        <mxCell id="realtime" value="Realtime&#xa;WebSocket" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#333333;fontSize=11;" vertex="1" parent="supabase">
+          <mxGeometry x="290" y="130" width="100" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Storage -->
+        <mxCell id="storage" value="Storage&#xa;S3-compat" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#333333;fontSize=11;" vertex="1" parent="supabase">
+          <mxGeometry x="420" y="130" width="100" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Functions -->
+        <mxCell id="functions" value="Edge&#xa;Functions" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#333333;fontSize=11;" vertex="1" parent="supabase">
+          <mxGeometry x="550" y="130" width="100" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Studio -->
+        <mxCell id="studio" value="Studio&#xa;jimr.fyi&#xa;(basic auth)" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=11;" vertex="1" parent="supabase">
+          <mxGeometry x="700" y="30" width="120" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Supavisor -->
+        <mxCell id="supavisor" value="Supavisor&#xa;Connection Pool&#xa;:6543" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#333333;fontSize=11;" vertex="1" parent="supabase">
+          <mxGeometry x="340" y="220" width="130" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Postgres -->
+        <mxCell id="postgres" value="PostgreSQL" style="shape=cylinder3;whiteSpace=wrap;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#333333;fontSize=12;fontStyle=1;" vertex="1" parent="supabase">
+          <mxGeometry x="300" y="295" width="220" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Tenant databases -->
+        <mxCell id="db_house" value="house_ops" style="text;fontSize=9;fontColor=#9673a6;fontStyle=2;align=center;" vertex="1" parent="supabase">
+          <mxGeometry x="300" y="337" width="70" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="db_practice" value="practice_exchange" style="text;fontSize=9;fontColor=#9673a6;fontStyle=2;align=center;" vertex="1" parent="supabase">
+          <mxGeometry x="370" y="337" width="90" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="db_event" value="event_planner" style="text;fontSize=9;fontColor=#9673a6;fontStyle=2;align=center;" vertex="1" parent="supabase">
+          <mxGeometry x="460" y="337" width="70" height="16" as="geometry"/>
+        </mxCell>
+
+        <!-- Kong to services edges -->
+        <mxCell id="e_kong_gotrue" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="supabase" source="kong" target="gotrue">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+        <mxCell id="e_kong_postgrest" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#6c8ebf;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="supabase" source="kong" target="postgrest">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+        <mxCell id="e_kong_realtime" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="supabase" source="kong" target="realtime">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+        <mxCell id="e_kong_storage" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="supabase" source="kong" target="storage">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+        <mxCell id="e_kong_functions" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="supabase" source="kong" target="functions">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+
+        <!-- Services to Supavisor -->
+        <mxCell id="svc_to_pool_label" value="all services" style="text;fontSize=9;fontColor=#9673a6;fontStyle=2;align=center;" vertex="1" parent="supabase">
+          <mxGeometry x="360" y="195" width="90" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_postgrest_sv" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;dashed=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="supabase" source="postgrest" target="supavisor">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+        <mxCell id="e_storage_sv" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;dashed=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="supabase" source="storage" target="supavisor">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+
+        <!-- Supavisor to Postgres -->
+        <mxCell id="e_sv_pg" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="supabase" source="supavisor" target="postgres">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+
+        <!-- Caddy to frontends edge -->
+        <mxCell id="e_caddy_fe" value="tenant domains" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;fontColor=#9673a6;fontSize=9;exitX=0.25;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="vps" source="caddy" target="frontends">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+
+        <!-- Caddy to Kong edge -->
+        <mxCell id="e_caddy_kong" value="api.jimr.fyi/*" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#6c8ebf;fontColor=#6c8ebf;fontSize=9;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="vps" source="caddy" target="kong">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+
+        <!-- Caddy to Studio edge -->
+        <mxCell id="e_caddy_studio" value="jimr.fyi" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#666666;fontColor=#666666;fontSize=9;exitX=0.75;exitY=1;" edge="1" parent="vps" source="caddy" target="studio">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+
+        <!-- Cloudflare to Firewall -->
+        <mxCell id="e_cf_fw" value="VPS IP hidden" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#4472C4;strokeWidth=2;fontColor=#4472C4;fontSize=9;" edge="1" parent="1" source="cloudflare" target="firewall">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+
+        <!-- Firewall to Caddy -->
+        <mxCell id="e_fw_caddy" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#6c8ebf;strokeWidth=2;fontColor=#6c8ebf;fontSize=10;" edge="1" parent="1" source="firewall" target="caddy">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+
+        <!-- Backup section -->
+        <mxCell id="backup_cron" value="Backup Cron&#xa;Daily 3am UTC&#xa;pg_dump + gzip" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#333333;fontSize=10;" vertex="1" parent="vps">
+          <mxGeometry x="780" y="530" width="130" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_pg_backup" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#d6b656;dashed=1;" edge="1" parent="vps" source="postgres" target="backup_cron">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+
+        <!-- fail2ban -->
+        <mxCell id="fail2ban" value="fail2ban&#xa;SSH brute-force&#xa;protection" style="rounded=1;whiteSpace=wrap;fillColor=#f0e6d2;strokeColor=#c4a35a;fontColor=#333333;fontSize=10;" vertex="1" parent="vps">
+          <mxGeometry x="780" y="20" width="120" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- Hetzner Object Storage (outside VPS, inside Hetzner) -->
+        <mxCell id="obj_storage" value="Hetzner Object Storage&#xa;jmr-backups&#xa;(S3-compatible)" style="shape=cylinder3;whiteSpace=wrap;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#f0e6d2;strokeColor=#c4a35a;fontColor=#333333;fontSize=11;" vertex="1" parent="hetzner">
+          <mxGeometry x="870" y="90" width="170" height="60" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_backup_s3" value="30-day retention" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#c4a35a;dashed=1;fontColor=#c4a35a;fontSize=9;" edge="1" parent="1" source="backup_cron" target="obj_storage">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+
+        <!-- CI/CD section (outside Hetzner) -->
+        <mxCell id="cicd" value="CI/CD" style="swimlane;startSize=20;fillColor=none;strokeColor=#666666;fontColor=#333333;fontSize=11;fontStyle=1;rounded=1;arcSize=10;recursiveResize=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="240" width="140" height="180" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="github" value="GitHub Actions&#xa;(ARM runner)" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=10;" vertex="1" parent="cicd">
+          <mxGeometry x="10" y="30" width="120" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="ghcr" value="GHCR&#xa;Container Registry" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=10;" vertex="1" parent="cicd">
+          <mxGeometry x="10" y="100" width="120" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_gh_ghcr" value="push image" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#666666;fontSize=9;fontColor=#666666;" edge="1" parent="cicd" source="github" target="ghcr">
+          <mxGeometry as="geometry"/>
+        </mxCell>
+
+        <!-- CI/CD deploys to VPS -->
+        <mxCell id="e_cicd_vps" value="SSH → docker pull + up" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#666666;dashed=1;fontSize=9;fontColor=#666666;" edge="1" parent="1" source="ghcr" target="frontends">
+          <mxGeometry as="geometry">
+            <Array as="points">
+              <mxPoint x="290" y="470"/>
+              <mxPoint x="290" y="500"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- DNS note (updated for Cloudflare) -->
+        <mxCell id="dns_note" value="DNS (Cloudflare, proxied)&#xa;───────────────────&#xa;jimr.fyi → CF proxy → VPS&#xa;house.jimr.fyi → CF → VPS&#xa;hike.jimr.fyi → CF → VPS&#xa;api.jimr.fyi → CF → VPS&#xa;practice.exchange → CF → VPS&#xa;&#xa;Registrar: Namecheap&#xa;NS → Cloudflare nameservers" style="shape=note;size=14;fillColor=#e6ecf0;strokeColor=#4472C4;fontColor=#333333;fontSize=10;align=left;spacingLeft=6;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="240" width="210" height="160" as="geometry"/>
+        </mxCell>
+
+        <!-- Provisioning note -->
+        <mxCell id="provision_note" value="Provisioning&#xa;─────────────&#xa;Terraform → VPS + firewall&#xa;Ansible → Docker, Caddy,&#xa;  Supabase, frontends,&#xa;  fail2ban, backup cron" style="shape=note;size=14;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=10;align=left;spacingLeft=6;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="420" width="190" height="110" as="geometry"/>
+        </mxCell>
+
+        <!-- Future: Identity-Aware Access note -->
+        <mxCell id="future_note" value="Future: Identity-Aware Access&#xa;─────────────────────&#xa;Zitadel (IdP) → OIDC tokens&#xa;Pomerium → per-route policy&#xa;&#xa;Caddy → Pomerium → App&#xa;           ↕&#xa;       Zitadel&#xa;&#xa;GoTrue stays for app users.&#xa;Zitadel for infra SSO." style="shape=note;size=14;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#333333;fontSize=10;align=left;spacingLeft=6;whiteSpace=wrap;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="550" width="210" height="170" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

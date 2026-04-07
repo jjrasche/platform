@@ -3,13 +3,31 @@ services:
   frontend-{{ tenant.name }}:
     image: ghcr.io/jjrasche/{{ tenant.repo }}:latest
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/caddy
+      - /var/run
     networks:
-      - default
+      - frontend
 
 {% endfor %}
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp
     ports:
       - "80:80"
       - "443:443"
@@ -24,25 +42,148 @@ services:
       - frontend-{{ tenant.name }}
 {% endfor %}
     networks:
+      - frontend
       - default
 
+  studio:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  kong:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    ports: !reset []
+
   auth:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
     environment:
       GOTRUE_SMS_PROVIDER: ${GOTRUE_SMS_PROVIDER}
       GOTRUE_SMS_TWILIO_VERIFY_ACCOUNT_SID: ${GOTRUE_SMS_TWILIO_VERIFY_ACCOUNT_SID}
       GOTRUE_SMS_TWILIO_VERIFY_AUTH_TOKEN: ${GOTRUE_SMS_TWILIO_VERIFY_AUTH_TOKEN}
       GOTRUE_SMS_TWILIO_VERIFY_MESSAGE_SERVICE_SID: ${GOTRUE_SMS_TWILIO_VERIFY_MESSAGE_SERVICE_SID}
 
-  kong:
-    ports: !reset []
+  rest:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  realtime:
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  storage:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  imgproxy:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  meta:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  functions:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  analytics:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  vector:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_READ_SEARCH
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/lib/vector
 
   db:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - FOWNER
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
     ports: !reset
       - "127.0.0.1:5432:5432"
 
   supavisor:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
     ports: !reset
       - "127.0.0.1:6543:6543"
+
+networks:
+  frontend:
 
 volumes:
   caddy_data:

@@ -21,7 +21,6 @@
   roles:
     - common
     - supabase
-    - frontend
 
   post_tasks:
     - name: Restrict deploy user sudo to docker commands

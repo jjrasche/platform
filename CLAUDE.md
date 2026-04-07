@@ -27,7 +27,6 @@ See `docs/platform-architecture.drawio` (and `.png` export) for full topology.
 - `terraform/hetzner/` — VPS, object storage bucket, firewall rules
 - `ansible/roles/common/` — Docker, Caddy, backup cron, monitoring
 - `ansible/roles/supabase/` — Supabase Docker Compose, env config
-- `ansible/roles/frontend/` — Generic static site deploy (build + serve)
 - `ansible/inventory/` — Host vars, vault-encrypted secrets
 - `scripts/` — Backup, restore, health check
 - `docs/` — Architecture decisions, runbooks

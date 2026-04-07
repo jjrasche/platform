@@ -7,6 +7,12 @@
     - inventory/group_vars/all/vault.yml
 
   tasks:
+    - name: Terraform init
+      command: >
+        {{ terraform_binary | default('terraform') }} init
+      args:
+        chdir: "{{ playbook_dir }}/../terraform/hetzner"
+
     - name: Terraform apply
       command: >
         {{ terraform_binary | default('terraform') }} apply -auto-approve

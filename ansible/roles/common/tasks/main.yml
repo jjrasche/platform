@@ -74,6 +74,12 @@
     state: directory
     mode: "0700"
 
+- name: Deploy platform scripts
+  copy:
+    src: "{{ playbook_dir }}/../scripts/"
+    dest: "{{ apps_dir }}/scripts/"
+    mode: "0755"
+
 - name: Create daily backup cron
   cron:
     name: "platform-backup"
@@ -105,3 +111,4 @@
     name: fail2ban
     state: started
     enabled: true
+

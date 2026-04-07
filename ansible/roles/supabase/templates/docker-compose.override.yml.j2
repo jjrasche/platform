@@ -36,29 +36,13 @@ services:
   kong:
     ports: !reset []
 
-  studio:
-    depends_on: !override
-      db:
-        condition: service_healthy
+  db:
+    ports: !reset
+      - "127.0.0.1:5432:5432"
 
-  storage:
-    depends_on: !override
-      db:
-        condition: service_healthy
-      rest:
-        condition: service_started
-
-  analytics:
-    profiles:
-      - disabled
-
-  vector:
-    profiles:
-      - disabled
-
-  imgproxy:
-    profiles:
-      - disabled
+  supavisor:
+    ports: !reset
+      - "127.0.0.1:6543:6543"
 
 volumes:
   caddy_data:

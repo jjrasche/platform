@@ -1,4 +1,19 @@
 ---
+- name: Apply infrastructure
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - inventory/group_vars/all/vault.yml
+
+  tasks:
+    - name: Terraform apply
+      command: >
+        /mnt/c/Users/rasche_j/bin/terraform.exe apply -auto-approve
+        -var="hcloud_token={{ vault_hcloud_token }}"
+      args:
+        chdir: "{{ playbook_dir }}/../terraform/hetzner"
+
 - name: Provision JMR Platform
   hosts: platform
   become: true
@@ -7,3 +22,10 @@
     - common
     - supabase
     - frontend
+
+  post_tasks:
+    - name: Restrict deploy user sudo to docker commands
+      copy:
+        content: "deploy ALL=(ALL) NOPASSWD: /usr/bin/docker, /usr/bin/docker compose *\n"
+        dest: /etc/sudoers.d/deploy
+        mode: "0440"

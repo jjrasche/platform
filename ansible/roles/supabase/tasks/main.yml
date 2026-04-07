@@ -6,7 +6,7 @@
     repo: https://github.com/supabase/supabase.git
     dest: "{{ supabase_dir }}"
     depth: 1
-    version: master
+    version: v1.26.03
     force: true
 
 - name: Template Supabase .env
@@ -47,11 +47,11 @@
     pull: "{{ 'always' if (vault_ghcr_token is defined and vault_ghcr_token != 'CHANGE_ME') else 'missing' }}"
 
 - name: Wait for Postgres
-  wait_for:
-    host: localhost
-    port: 5432
-    delay: 5
-    timeout: 60
+  shell: docker exec supabase-db pg_isready -U supabase_admin
+  register: pg_ready
+  retries: 12
+  delay: 5
+  until: pg_ready.rc == 0
 
 - name: Create tenant databases
   shell: |

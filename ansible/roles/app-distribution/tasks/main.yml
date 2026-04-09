@@ -1,0 +1,23 @@
+---
+# Serve APKs and update manifests for tenants with mobile apps
+
+- name: Create app distribution directories
+  file:
+    path: "/opt/app-dist/{{ item.1.slug }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ tenants | subelements('apps', skip_missing=True) }}"
+  loop_control:
+    label: "{{ item.0.name }}/{{ item.1.slug }}"
+
+- name: Template app manifests
+  template:
+    src: manifest.json.j2
+    dest: "/opt/app-dist/{{ item.1.slug }}/manifest.json"
+    mode: "0644"
+  vars:
+    tenant: "{{ item.0 }}"
+    app: "{{ item.1 }}"
+  loop: "{{ tenants | subelements('apps', skip_missing=True) }}"
+  loop_control:
+    label: "{{ item.0.name }}/{{ item.1.slug }}"

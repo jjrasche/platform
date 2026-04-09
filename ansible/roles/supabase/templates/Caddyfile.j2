@@ -11,6 +11,12 @@
 }
 
 {% endfor %}
+{{ app_distribution_domain }} {
+    root * /opt/app-dist
+    @apk path *.apk
+    header @apk Content-Type application/vnd.android.package-archive
+    file_server browse
+}
 {{ supabase_api_domain }} {
     handle /rest/v1/* {
         reverse_proxy kong:8000

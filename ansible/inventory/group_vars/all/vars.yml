@@ -8,6 +8,7 @@ supabase_dir: /opt/supabase
 apps_dir: /opt/apps
 backup_dir: /opt/backups
 backup_bucket: jmr-backups
+app_distribution_domain: apps.jimr.fyi
 
 # Tenant list — add new apps here
 # Each tenant has its own domain (subdomain of primary or standalone)
@@ -16,6 +17,11 @@ tenants:
     domain: house.jimr.fyi
     database: house_ops
     repo: house-ops
+    apps:
+      - slug: houseops
+        version: "0.1.0"
+        version_code: 1
+        minimum_version: "0.1.0"
 
   - name: practice-exchange
     domain: practice.exchange

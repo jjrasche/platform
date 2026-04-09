@@ -36,6 +36,7 @@ services:
       - ./volumes/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+      - /opt/app-dist:/opt/app-dist:ro
     depends_on:
       - kong
 {% for tenant in tenants %}

@@ -18,7 +18,7 @@ endpoints:
     url: "https://{{ supabase_api_domain }}/rest/v1/"
     interval: 5m
     headers:
-      apikey: "{{ vault_supabase_anon_key }}"
+      apikey: "{{ vault_anon_key }}"
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 3000"

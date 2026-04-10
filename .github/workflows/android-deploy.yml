@@ -1,0 +1,182 @@
+name: Android APK Build and Deploy
+
+# Reusable workflow for Android APK builds and deployment.
+#
+# Include in app repo's .github/workflows/:
+#   on:
+#     push:
+#       tags: ['v[0-9]+.[0-9]+.[0-9]+']
+#   jobs:
+#     deploy:
+#       uses: jjrasche/platform/.github/workflows/android-deploy.yml@master
+#       with:
+#         app_slug: houseops
+#         apk_path: android/app/build/outputs/apk/release/app-release.apk
+#         min_version: '0.1.0'
+#       secrets: inherit
+#
+# Required repository secrets (set in GitHub repo settings):
+#   KEYSTORE_BASE64       - base64-encoded release keystore
+#   KEYSTORE_PASSWORD     - keystore password
+#   KEY_ALIAS             - signing key alias
+#   KEY_PASSWORD          - signing key password
+#   PLATFORM_SSH_KEY      - SSH private key for deploy@VPS
+#   PLATFORM_IP           - VPS IP address
+#   SUPABASE_SERVICE_KEY  - Supabase service_role key for app_releases insert
+
+on:
+  workflow_call:
+    inputs:
+      app_slug:
+        required: true
+        type: string
+        description: "App identifier (e.g. houseops)"
+      apk_path:
+        required: true
+        type: string
+        description: "Relative path to built APK"
+      min_version:
+        required: true
+        type: string
+        description: "Minimum supported version (for forced upgrades)"
+    secrets:
+      KEYSTORE_BASE64:
+        required: true
+      KEYSTORE_PASSWORD:
+        required: true
+      KEY_ALIAS:
+        required: true
+      KEY_PASSWORD:
+        required: true
+      PLATFORM_SSH_KEY:
+        required: true
+      PLATFORM_IP:
+        required: true
+      SUPABASE_SERVICE_KEY:
+        required: true
+
+env:
+  DIST_DOMAIN: apps.jimr.fyi
+  SUPABASE_API_URL: https://api.jimr.fyi
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.jks
+
+      - name: Build signed APK
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=/tmp/release.jks \
+            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
+
+      - name: Clean up keystore
+        if: always()
+        run: rm -f /tmp/release.jks
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-apk
+          path: ${{ inputs.apk_path }}
+          retention-days: 7
+
+  upload:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-apk
+          path: artifact
+
+      - name: Upload APK to VPS
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          VERSION="${VERSION#v}"
+          DEST_FILE="${{ inputs.app_slug }}-${VERSION}.apk"
+          APK_FILE=$(find artifact -name '*.apk' -type f | head -1)
+
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PLATFORM_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=accept-new \
+            "deploy@${{ secrets.PLATFORM_IP }}" \
+            "mkdir -p /opt/app-dist/${{ inputs.app_slug }}"
+
+          scp -i ~/.ssh/id_deploy -o StrictHostKeyChecking=accept-new \
+            "${APK_FILE}" \
+            "deploy@${{ secrets.PLATFORM_IP }}:/opt/app-dist/${{ inputs.app_slug }}/${DEST_FILE}"
+
+          rm -f ~/.ssh/id_deploy
+
+  verify:
+    needs: upload
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify APK is downloadable
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          VERSION="${VERSION#v}"
+          DOWNLOAD_URL="https://${{ env.DIST_DOMAIN }}/${{ inputs.app_slug }}/${{ inputs.app_slug }}-${VERSION}.apk"
+          echo "Verifying ${DOWNLOAD_URL}"
+
+          HTTP_STATUS=$(curl -sf -o /dev/null -w '%{http_code}' "$DOWNLOAD_URL" || true)
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "APK not downloadable (HTTP ${HTTP_STATUS})"
+            exit 1
+          fi
+          echo "Verified: ${DOWNLOAD_URL}"
+
+  register:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Register release in Supabase
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          VERSION="${VERSION#v}"
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          VERSION_CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+
+          DOWNLOAD_URL="https://${{ env.DIST_DOMAIN }}/${{ inputs.app_slug }}/${{ inputs.app_slug }}-${VERSION}.apk"
+
+          RESPONSE=$(curl -sf -w '\n%{http_code}' \
+            "${{ env.SUPABASE_API_URL }}/rest/v1/app_releases" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d "{
+              \"app_slug\": \"${{ inputs.app_slug }}\",
+              \"version\": \"${VERSION}\",
+              \"version_code\": ${VERSION_CODE},
+              \"minimum_version\": \"${{ inputs.min_version }}\",
+              \"download_url\": \"${DOWNLOAD_URL}\"
+            }")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          if [ "$HTTP_CODE" != "201" ]; then
+            echo "Failed to register release (HTTP ${HTTP_CODE})"
+            echo "$RESPONSE"
+            exit 1
+          fi
+          echo "Registered ${{ inputs.app_slug }} v${VERSION} (code ${VERSION_CODE})"

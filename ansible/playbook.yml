@@ -27,5 +27,6 @@
   roles:
     - common
     - supabase
+    - monitoring
     - app-distribution
 

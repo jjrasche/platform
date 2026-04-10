@@ -16,6 +16,22 @@ services:
       - frontend
 
 {% endfor %}
+  gatus:
+    image: twinproduction/gatus:latest
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - /opt/gatus/config.yaml:/config/config.yaml:ro
+      - gatus_data:/data
+    networks:
+      - frontend
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -39,6 +55,7 @@ services:
       - /opt/app-dist:/opt/app-dist:ro
     depends_on:
       - kong
+      - gatus
 {% for tenant in tenants %}
       - frontend-{{ tenant.name }}
 {% endfor %}
@@ -189,3 +206,4 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
+  gatus_data:

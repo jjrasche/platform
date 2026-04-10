@@ -1,0 +1,24 @@
+#!/bin/bash
+# Retain only the latest N APKs per app slug, delete the rest
+set -euo pipefail
+
+KEEP={{ apk_retention_count }}
+DIST_DIR="/opt/app-dist"
+
+{% for tenant in tenants %}
+{% for app in tenant.apps | default([]) %}
+SLUG_DIR="${DIST_DIR}/{{ app.slug }}"
+if [ -d "$SLUG_DIR" ]; then
+    APK_COUNT=$(find "$SLUG_DIR" -maxdepth 1 -name '*.apk' | wc -l)
+    if [ "$APK_COUNT" -gt "$KEEP" ]; then
+        # Sort by modification time (newest first), skip the first N, delete the rest
+        find "$SLUG_DIR" -maxdepth 1 -name '*.apk' -printf '%T@ %p\n' \
+            | sort -rn \
+            | tail -n +"$((KEEP + 1))" \
+            | cut -d' ' -f2- \
+            | xargs rm -f
+        echo "[$(date)] {{ app.slug }}: pruned to ${KEEP} APKs"
+    fi
+fi
+{% endfor %}
+{% endfor %}

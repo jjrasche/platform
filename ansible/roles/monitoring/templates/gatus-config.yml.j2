@@ -1,0 +1,38 @@
+storage:
+  type: sqlite
+  path: /data/gatus.db
+
+endpoints:
+{% for tenant in tenants %}
+  - name: "{{ tenant.name }} frontend"
+    group: frontends
+    url: "https://{{ tenant.domain }}"
+    interval: 5m
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+
+{% endfor %}
+  - name: "Supabase REST API"
+    group: supabase
+    url: "https://{{ supabase_api_domain }}/rest/v1/"
+    interval: 5m
+    headers:
+      apikey: "{{ vault_supabase_anon_key }}"
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 3000"
+
+  - name: "Supabase Auth"
+    group: supabase
+    url: "https://{{ supabase_api_domain }}/auth/v1/health"
+    interval: 5m
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: "App Distribution"
+    group: distribution
+    url: "https://{{ app_distribution_domain }}"
+    interval: 5m
+    conditions:
+      - "[STATUS] == 200"

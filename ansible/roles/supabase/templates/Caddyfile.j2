@@ -17,6 +17,9 @@
     header @apk Content-Type application/vnd.android.package-archive
     file_server browse
 }
+{{ monitoring_domain }} {
+    reverse_proxy gatus:8080
+}
 {{ supabase_api_domain }} {
     handle /rest/v1/* {
         reverse_proxy kong:8000

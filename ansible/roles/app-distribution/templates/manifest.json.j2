@@ -1,9 +1,0 @@
-{
-  "version": "{{ app.version }}",
-  "minimumVersion": "{{ app.minimum_version }}",
-  "android": {
-    "url": "https://{{ app_distribution_domain }}/{{ app.slug }}/{{ app.slug }}-{{ app.version }}.apk",
-    "versionCode": {{ app.version_code }}
-  },
-  "updatedAt": "{{ ansible_date_time.iso8601 | default(lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ')) }}"
-}

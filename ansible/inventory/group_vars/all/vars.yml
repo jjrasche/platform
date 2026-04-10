@@ -9,9 +9,13 @@ apps_dir: /opt/apps
 backup_dir: /opt/backups
 backup_bucket: jmr-backups
 app_distribution_domain: apps.jimr.fyi
+monitoring_domain: status.jimr.fyi
+apk_retention_count: 5
 
 # Tenant list — add new apps here
 # Each tenant has its own domain (subdomain of primary or standalone)
+# Apps with mobile builds get an `apps` list with slug only;
+# version metadata lives in Supabase app_releases table.
 tenants:
   - name: house-ops
     domain: house.jimr.fyi
@@ -19,9 +23,6 @@ tenants:
     repo: house-ops
     apps:
       - slug: houseops
-        version: "0.1.0"
-        version_code: 1
-        minimum_version: "0.1.0"
 
   - name: practice-exchange
     domain: practice.exchange

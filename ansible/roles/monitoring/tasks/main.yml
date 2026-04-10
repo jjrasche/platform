@@ -1,0 +1,14 @@
+---
+# Deploy Gatus health monitoring with config-as-code
+
+- name: Create Gatus config directory
+  file:
+    path: /opt/gatus
+    state: directory
+    mode: "0755"
+
+- name: Template Gatus configuration
+  template:
+    src: gatus-config.yml.j2
+    dest: /opt/gatus/config.yaml
+    mode: "0600"

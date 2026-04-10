@@ -1,23 +1,26 @@
 ---
-# Serve APKs and update manifests for tenants with mobile apps
+# App distribution: directory structure + APK retention policy
 
 - name: Create app distribution directories
   file:
     path: "/opt/app-dist/{{ item.1.slug }}"
     state: directory
+    owner: deploy
+    group: deploy
     mode: "0755"
   loop: "{{ tenants | subelements('apps', skip_missing=True) }}"
   loop_control:
     label: "{{ item.0.name }}/{{ item.1.slug }}"
 
-- name: Template app manifests
+- name: Deploy APK retention script
   template:
-    src: manifest.json.j2
-    dest: "/opt/app-dist/{{ item.1.slug }}/manifest.json"
-    mode: "0644"
-  vars:
-    tenant: "{{ item.0 }}"
-    app: "{{ item.1 }}"
-  loop: "{{ tenants | subelements('apps', skip_missing=True) }}"
-  loop_control:
-    label: "{{ item.0.name }}/{{ item.1.slug }}"
+    src: retain-apks.sh.j2
+    dest: /opt/app-dist/retain-apks.sh
+    mode: "0755"
+
+- name: Schedule daily APK retention
+  cron:
+    name: "apk-retention"
+    hour: "4"
+    minute: "0"
+    job: "/opt/app-dist/retain-apks.sh >> /var/log/apk-retention.log 2>&1"

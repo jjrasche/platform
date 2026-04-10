@@ -11,7 +11,7 @@ name: Android APK Build and Deploy
 #       uses: jjrasche/platform/.github/workflows/android-deploy.yml@master
 #       with:
 #         app_slug: houseops
-#         apk_path: android/app/build/outputs/apk/release/app-release.apk
+#         app_dir: apps/expo
 #         min_version: '0.1.0'
 #       secrets: inherit
 #
@@ -31,10 +31,11 @@ on:
         required: true
         type: string
         description: "App identifier (e.g. houseops)"
-      apk_path:
-        required: true
+      app_dir:
+        required: false
         type: string
-        description: "Relative path to built APK"
+        default: "."
+        description: "Directory containing the Expo/Android project"
       min_version:
         required: true
         type: string
@@ -62,8 +63,20 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.app_dir }}
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: .
 
       - uses: actions/setup-java@v4
         with:
@@ -72,11 +85,15 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
+      - name: Generate native project
+        run: npx expo prebuild --platform android --no-install
+
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.jks
 
       - name: Build signed APK
         run: |
+          cd android
           chmod +x ./gradlew
           ./gradlew assembleRelease \
             -Pandroid.injected.signing.store.file=/tmp/release.jks \
@@ -91,7 +108,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: signed-apk
-          path: ${{ inputs.apk_path }}
+          path: ${{ inputs.app_dir }}/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
 
   upload:

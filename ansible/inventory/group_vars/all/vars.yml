@@ -11,6 +11,7 @@ backup_bucket: jmr-backups
 app_distribution_domain: apps.jimr.fyi
 monitoring_domain: status.jimr.fyi
 apk_retention_count: 5
+ci_deploy_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPMpe8/hgmlj+2Nlvymf8iWxBnNzaIBUyPkDtJvz2+R6 ci-deploy@platform"
 
 # Tenant list — add new apps here
 # Each tenant has its own domain (subdomain of primary or standalone)

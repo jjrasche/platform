@@ -23,7 +23,7 @@
 - name: Add CI deploy key for deploy user
   authorized_key:
     user: deploy
-    key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPMpe8/hgmlj+2Nlvymf8iWxBnNzaIBUyPkDtJvz2+R6 ci-deploy@platform"
+    key: "{{ ci_deploy_public_key }}"
 
 - name: Update apt cache
   apt:

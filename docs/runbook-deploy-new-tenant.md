@@ -4,48 +4,38 @@ Adding a new app to the platform.
 
 ## Prerequisites
 
-- App repo has a `frontend/Dockerfile` that produces a static site
-- App has Supabase migrations in `supabase/migrations/`
-- DNS A record for the tenant's domain points at VPS IP
+- App repo has a `frontend/Dockerfile` that produces a static site served on port 80
+- App repo calls the `build-deploy.yml` reusable workflow (see house-ops for example)
+- Docker image pushed to `ghcr.io/jjrasche/<repo-name>:latest`
+- DNS A record for the tenant's domain points at VPS IP (no wildcard — individual records)
 
 ## Steps
 
-1. **Create database**
-   ```sql
-   CREATE DATABASE new_app_name;
-   ```
-
-2. **Apply migrations**
-   ```bash
-   PGPASSWORD=$PG_PASS psql -h localhost -U postgres -d new_app_name \
-     -f /path/to/migrations/*.sql
-   ```
-
-3. **Add Caddy route** — append to Caddyfile:
-   ```
-   newapp.example.com {
-       reverse_proxy frontend-newapp:3004
-   }
-   ```
-
-4. **Add frontend container** — append to docker-compose.override.yml:
+1. **Add tenant to vars.yml**
    ```yaml
-   frontend-newapp:
-     build:
-       context: /opt/apps/newapp/frontend
-       args:
-         VITE_SUPABASE_URL: "https://api.jimr.fyi"
-         VITE_SUPABASE_ANON_KEY: "${ANON_KEY}"
-     restart: unless-stopped
+   # ansible/inventory/group_vars/all/vars.yml
+   tenants:
+     - name: my-app
+       domain: myapp.jimr.fyi
+       database: my_app
+       repo: my-app
    ```
+   Ansible templates generate the Caddyfile route, Docker Compose service, and Gatus monitor automatically.
 
-5. **Deploy**
-   ```bash
-   docker compose up -d --build frontend-newapp
-   docker exec caddy caddy reload --config /etc/caddy/Caddyfile
-   ```
+2. **Create Cloudflare DNS record**
+   - Type: A
+   - Name: subdomain (e.g., `myapp`)
+   - Content: VPS IP
+   - Proxy: enabled
 
-6. **Verify**
+3. **Run Ansible**
    ```bash
-   curl -s https://newapp.example.com | head -5
+   cd ansible && ansible-playbook -i inventory playbook.yml
    ```
+   This regenerates Caddyfile, docker-compose.override.yml, and gatus config, then restarts Caddy.
+
+4. **Verify**
+   ```bash
+   curl -s https://myapp.jimr.fyi | head -5
+   ```
+   Check Gatus at `https://status.jimr.fyi` for the new endpoint monitor.

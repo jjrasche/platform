@@ -34,3 +34,8 @@ tenants:
     domain: hike.jimr.fyi
     database: event_planner
     repo: event-planner
+
+  - name: minecraft-companion
+    domain: minecraft.jimr.fyi
+    database: minecraft_companion
+    repo: minecraft-companion

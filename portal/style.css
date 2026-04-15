@@ -79,26 +79,6 @@ h2 {
   margin-top: 0.75rem;
 }
 
-.btn-google {
-  background: #1a73e8;
-  border-color: #1a73e8;
-}
-
-.btn-google:hover {
-  background: #1557b0;
-  border-color: #1557b0;
-}
-
-.btn-github {
-  background: #24292f;
-  border-color: #444c56;
-}
-
-.btn-github:hover {
-  background: #32383f;
-  border-color: #545d68;
-}
-
 .btn-secondary {
   background: transparent;
   border-color: #475569;
@@ -146,29 +126,30 @@ form .btn {
   border-color: #2563eb;
 }
 
-.divider {
-  display: flex;
-  align-items: center;
-  margin: 1.25rem 0;
-  color: #64748b;
-  font-size: 0.8rem;
-}
-
-.divider::before,
-.divider::after {
-  content: "";
-  flex: 1;
-  border-bottom: 1px solid #334155;
-}
-
-.divider span {
-  padding: 0 0.75rem;
-}
-
 .error {
   color: #f87171;
   font-size: 0.875rem;
   margin-top: 1rem;
+}
+
+.success {
+  color: #4ade80;
+  font-size: 0.875rem;
+  margin-top: 1rem;
+}
+
+.toggle-link {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
+.toggle-link a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+.toggle-link a:hover {
+  text-decoration: underline;
 }
 
 .app-name {

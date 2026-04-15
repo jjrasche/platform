@@ -4,7 +4,7 @@
 // Flow:
 // 1. Tenant app redirects to GoTrue /oauth/authorize
 // 2. GoTrue redirects to this portal at /authorize if no session
-// 3. User signs in via email/password or Google/GitHub
+// 3. User signs in or signs up via email/password
 // 4. GoTrue sets session cookie, redirects back to tenant app with auth code
 
 const SUPABASE_URL = "https://api.jimr.fyi";
@@ -93,34 +93,57 @@ async function init() {
   showLoginView();
 }
 
+let isSignUp = false;
+
 function bindLoginButtons(sb) {
+  document.getElementById("toggle-mode").addEventListener("click", (e) => {
+    e.preventDefault();
+    isSignUp = !isSignUp;
+    document.getElementById("auth-subtitle").textContent = isSignUp
+      ? "Create an account"
+      : "Sign in to continue";
+    document.getElementById("btn-submit").textContent = isSignUp
+      ? "Sign Up"
+      : "Sign In";
+    document.getElementById("toggle-mode").textContent = isSignUp
+      ? "Already have an account? Sign in"
+      : "Don't have an account? Sign up";
+    document.getElementById("login-error").classList.add("hidden");
+    document.getElementById("login-success").classList.add("hidden");
+  });
+
   document.getElementById("form-email").addEventListener("submit", async (e) => {
     e.preventDefault();
     const email = document.getElementById("input-email").value;
     const password = document.getElementById("input-password").value;
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) {
-      showError(error.message);
-      return;
+
+    if (isSignUp) {
+      const { data, error } = await sb.auth.signUp({ email, password });
+      if (error) {
+        showError(error.message);
+        return;
+      }
+      if (data.session) {
+        handlePostLogin(sb, data.session);
+      } else {
+        showSuccess("Check your email to confirm your account.");
+      }
+    } else {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        showError(error.message);
+        return;
+      }
+      handlePostLogin(sb, data.session);
     }
-    handlePostLogin(sb, data.session);
   });
+}
 
-  document.getElementById("btn-google").addEventListener("click", async () => {
-    const { error } = await sb.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.location.href },
-    });
-    if (error) showError(error.message);
-  });
-
-  document.getElementById("btn-github").addEventListener("click", async () => {
-    const { error } = await sb.auth.signInWithOAuth({
-      provider: "github",
-      options: { redirectTo: window.location.href },
-    });
-    if (error) showError(error.message);
-  });
+function showSuccess(message) {
+  const el = document.getElementById("login-success");
+  el.textContent = message;
+  el.classList.remove("hidden");
+  document.getElementById("login-error").classList.add("hidden");
 }
 
 function showLoginView() {

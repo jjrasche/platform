@@ -110,6 +110,9 @@ function bindLoginButtons(sb) {
       : "Don't have an account? Sign up";
     document.getElementById("login-error").classList.add("hidden");
     document.getElementById("login-success").classList.add("hidden");
+    document.getElementById("input-password").autocomplete = isSignUp
+      ? "new-password"
+      : "current-password";
   });
 
   document.getElementById("form-email").addEventListener("submit", async (e) => {

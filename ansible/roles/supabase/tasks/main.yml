@@ -89,7 +89,7 @@
 
 # New domains require a full restart — Caddy reload doesn't pick them up
 - name: Restart Caddy for new domains
-  shell: docker restart supabase-caddy
+  shell: docker restart $(docker ps --format '{{.Names}}' | grep caddy)
   when: caddyfile_result is changed
   register: caddy_restarted
 

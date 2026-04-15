@@ -4,7 +4,7 @@
 // Flow:
 // 1. Tenant app redirects to GoTrue /oauth/authorize
 // 2. GoTrue redirects to this portal at /authorize if no session
-// 3. User signs in via Google/GitHub
+// 3. User signs in via email/password or Google/GitHub
 // 4. GoTrue sets session cookie, redirects back to tenant app with auth code
 
 const SUPABASE_URL = "https://api.jimr.fyi";
@@ -94,12 +94,22 @@ async function init() {
 }
 
 function bindLoginButtons(sb) {
+  document.getElementById("form-email").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("input-email").value;
+    const password = document.getElementById("input-password").value;
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) {
+      showError(error.message);
+      return;
+    }
+    handlePostLogin(sb, data.session);
+  });
+
   document.getElementById("btn-google").addEventListener("click", async () => {
     const { error } = await sb.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: window.location.href,
-      },
+      options: { redirectTo: window.location.href },
     });
     if (error) showError(error.message);
   });
@@ -107,9 +117,7 @@ function bindLoginButtons(sb) {
   document.getElementById("btn-github").addEventListener("click", async () => {
     const { error } = await sb.auth.signInWithOAuth({
       provider: "github",
-      options: {
-        redirectTo: window.location.href,
-      },
+      options: { redirectTo: window.location.href },
     });
     if (error) showError(error.message);
   });
@@ -130,7 +138,7 @@ async function handleAuthorize(sb, session) {
   if (!session) {
     // Store OAuth params, show login. After login, redirect back to /authorize with same params.
     sessionStorage.setItem("oauth_authorize_params", window.location.search);
-    showLoginButtons(sb);
+    showLoginView();
     return;
   }
 

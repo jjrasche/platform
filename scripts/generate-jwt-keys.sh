@@ -1,19 +1,46 @@
 #!/usr/bin/env bash
-# Generate asymmetric JWT keys for Supabase OAuth 2.1 Server.
-# Run this once, then add the output values to ansible vault.
+# Generate ES256 JWT keys and add them to Ansible vault.
+# Run from WSL in the platform repo root.
 #
-# Prerequisites: openssl, python3
-# Usage: ./scripts/generate-jwt-keys.sh <current-jwt-secret>
+# Prerequisites: openssl, python3, ansible-vault
+# Usage: ./scripts/generate-jwt-keys.sh
 
 set -euo pipefail
 
-if [ $# -lt 1 ]; then
-  echo "Usage: $0 <current-jwt-secret>"
-  echo "  Get current JWT_SECRET from: ansible-vault view ansible/inventory/group_vars/all/vault.yml"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+VAULT_FILE="$REPO_ROOT/ansible/inventory/group_vars/all/vault.yml"
+VAULT_PASS_FILE="${VAULT_PASS_FILE:-/home/jrasche/.vault_pass}"
+
+if [ ! -f "$VAULT_FILE" ]; then
+  echo "ERROR: vault.yml not found at $VAULT_FILE"
   exit 1
 fi
 
-JWT_SECRET="$1"
+if [ ! -f "$VAULT_PASS_FILE" ]; then
+  echo "ERROR: vault password file not found at $VAULT_PASS_FILE"
+  echo "  Set VAULT_PASS_FILE env var if it's elsewhere"
+  exit 1
+fi
+
+# Read current JWT_SECRET from vault
+JWT_SECRET=$(ansible-vault view "$VAULT_FILE" --vault-password-file "$VAULT_PASS_FILE" \
+  | grep '^vault_jwt_secret:' | sed 's/vault_jwt_secret: *//')
+
+if [ -z "$JWT_SECRET" ]; then
+  echo "ERROR: could not read vault_jwt_secret from vault"
+  exit 1
+fi
+
+echo "Read JWT_SECRET from vault."
+
+# Check if keys already exist
+if ansible-vault view "$VAULT_FILE" --vault-password-file "$VAULT_PASS_FILE" \
+  | grep -q '^vault_gotrue_jwt_keys:'; then
+  echo "ERROR: vault_gotrue_jwt_keys already exists in vault."
+  echo "  Remove it first if you want to regenerate."
+  exit 1
+fi
+
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
@@ -23,8 +50,8 @@ openssl ec -in "$TMPDIR/ec_private.pem" -pubout -out "$TMPDIR/ec_public.pem" 2>/
 
 echo "Converting to JWK format..."
 
-python3 - "$TMPDIR/ec_private.pem" "$TMPDIR/ec_public.pem" "$JWT_SECRET" <<'PYEOF'
-import sys, json, base64, hashlib
+python3 - "$TMPDIR/ec_private.pem" "$JWT_SECRET" > "$TMPDIR/vault_lines.yml" <<'PYEOF'
+import sys, json, base64, hashlib, subprocess
 
 def b64url(data):
     if isinstance(data, str):
@@ -34,90 +61,52 @@ def b64url(data):
 def b64url_uint(num_bytes):
     return base64.urlsafe_b64encode(num_bytes).rstrip(b"=").decode()
 
-def pem_to_ec_jwk(private_pem, public_pem):
-    """Extract EC key components from PEM using openssl output parsing."""
-    import subprocess
-    result = subprocess.run(
-        ["openssl", "ec", "-in", private_pem, "-text", "-noout"],
-        capture_output=True, text=True
-    )
-    lines = result.stdout.replace(" ", "").replace(":", "").replace("\n", "")
-
-    # Parse the private key value (after "priv:")
-    priv_start = lines.index("priv:") + 5
-    pub_start = lines.index("pub:")
-    priv_hex = lines[priv_start:pub_start]
-    d_bytes = bytes.fromhex(priv_hex)
-    # Ensure 32 bytes (pad or trim leading zero)
-    d_bytes = d_bytes[-32:].rjust(32, b"\x00")
-
-    pub_hex = lines[pub_start + 4:]
-    # Remove the 04 prefix (uncompressed point indicator)
-    if pub_hex.startswith("04"):
-        pub_hex = pub_hex[2:]
-    x_bytes = bytes.fromhex(pub_hex[:64])
-    y_bytes = bytes.fromhex(pub_hex[64:128])
-
-    kid = hashlib.sha256(x_bytes + y_bytes).hexdigest()[:16]
-
-    private_jwk = {
-        "kty": "EC",
-        "crv": "P-256",
-        "kid": kid,
-        "use": "sig",
-        "alg": "ES256",
-        "x": b64url_uint(x_bytes),
-        "y": b64url_uint(y_bytes),
-        "d": b64url_uint(d_bytes),
-    }
-    public_jwk = {k: v for k, v in private_jwk.items() if k != "d"}
-    return private_jwk, public_jwk, kid
-
-def jwt_secret_to_jwk(secret):
-    """Wrap HS256 secret as a JWK for backward compatibility."""
-    return {
-        "kty": "oct",
-        "k": b64url(secret),
-        "kid": "legacy-hs256",
-        "use": "sig",
-        "alg": "HS256",
-    }
-
 private_pem = sys.argv[1]
-public_pem = sys.argv[2]
-jwt_secret = sys.argv[3]
+jwt_secret = sys.argv[2]
 
-private_jwk, public_jwk, kid = pem_to_ec_jwk(private_pem, public_pem)
-hs256_jwk = jwt_secret_to_jwk(jwt_secret)
+# Extract EC key components via openssl
+result = subprocess.run(
+    ["openssl", "ec", "-in", private_pem, "-text", "-noout"],
+    capture_output=True, text=True
+)
+lines = result.stdout.replace(" ", "").replace(":", "").replace("\n", "")
 
-# GOTRUE_JWT_KEYS: private key for GoTrue to sign tokens
+priv_start = lines.index("priv:") + 5
+pub_start = lines.index("pub:")
+priv_hex = lines[priv_start:pub_start]
+d_bytes = bytes.fromhex(priv_hex)[-32:].rjust(32, b"\x00")
+
+pub_hex = lines[pub_start + 4:]
+if pub_hex.startswith("04"):
+    pub_hex = pub_hex[2:]
+x_bytes = bytes.fromhex(pub_hex[:64])
+y_bytes = bytes.fromhex(pub_hex[64:128])
+
+kid = hashlib.sha256(x_bytes + y_bytes).hexdigest()[:16]
+
+private_jwk = {
+    "kty": "EC", "crv": "P-256", "kid": kid, "use": "sig", "alg": "ES256",
+    "x": b64url_uint(x_bytes), "y": b64url_uint(y_bytes), "d": b64url_uint(d_bytes),
+}
+public_jwk = {k: v for k, v in private_jwk.items() if k != "d"}
+hs256_jwk = {"kty": "oct", "k": b64url(jwt_secret), "kid": "legacy-hs256", "use": "sig", "alg": "HS256"}
+
 gotrue_jwt_keys = json.dumps({"keys": [private_jwk]}, separators=(",", ":"))
-
-# JWT_JWKS: public key + legacy HS256 for verification services
 jwt_jwks = json.dumps({"keys": [public_jwk, hs256_jwk]}, separators=(",", ":"))
 
-print()
-print("=" * 60)
-print("Add these to ansible vault (vault.yml):")
-print("=" * 60)
-print()
 print(f"vault_gotrue_jwt_keys: '{gotrue_jwt_keys}'")
-print()
 print(f"vault_jwt_jwks: '{jwt_jwks}'")
-print()
-print("=" * 60)
-print("IMPORTANT: After deploying with these keys, existing")
-print("HS256 tokens remain valid (JWT_JWKS includes the legacy key).")
-print("New tokens will be signed with ES256.")
-print()
-print("You must also re-sign ANON_KEY and SERVICE_ROLE_KEY")
-print("with the new ES256 key. Use the Supabase key generation")
-print("utility or jwt.io to create new keys with these claims:")
-print()
-print("  ANON_KEY:  {\"role\": \"anon\", \"iss\": \"supabase\"}")
-print("  SERVICE:   {\"role\": \"service_role\", \"iss\": \"supabase\"}")
-print("=" * 60)
 PYEOF
 
+echo "Adding keys to vault..."
+
+# Decrypt, append, re-encrypt
+ansible-vault decrypt "$VAULT_FILE" --vault-password-file "$VAULT_PASS_FILE"
+echo "" >> "$VAULT_FILE"
+echo "# Asymmetric JWT keys for OAuth 2.1 Server (ES256)" >> "$VAULT_FILE"
+cat "$TMPDIR/vault_lines.yml" >> "$VAULT_FILE"
+ansible-vault encrypt "$VAULT_FILE" --vault-password-file "$VAULT_PASS_FILE"
+
 echo ""
-echo "Done. See output above for vault values."
+echo "Done. Keys added to vault. Existing HS256 tokens remain valid."
+echo "Deploy with: cd ansible && ansible-playbook -i inventory playbook.yml"

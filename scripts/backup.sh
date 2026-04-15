@@ -5,7 +5,7 @@ set -euo pipefail
 BACKUP_DIR="/opt/backups"
 DATE=$(date +%Y%m%d)
 
-DATABASES=("house_ops" "practice_exchange" "event_planner")
+DATABASES=("house_ops" "practice_exchange" "event_planner" "minecraft_companion" "postgres")
 
 for DB in "${DATABASES[@]}"; do
   DUMP_FILE="${BACKUP_DIR}/${DB}-${DATE}.sql.gz"

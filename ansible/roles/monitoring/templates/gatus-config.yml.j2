@@ -2,6 +2,17 @@ storage:
   type: sqlite
   path: /data/gatus.db
 
+{% if vault_gatus_discord_webhook is defined %}
+alerting:
+  discord:
+    webhook-url: "{{ vault_gatus_discord_webhook }}"
+    default-alert:
+      enabled: true
+      failure-threshold: 3
+      success-threshold: 2
+      send-on-resolved: true
+{% endif %}
+
 endpoints:
 {% for tenant in tenants %}
   - name: "{{ tenant.name }} frontend"
@@ -11,6 +22,10 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 5000"
+{% if vault_gatus_discord_webhook is defined %}
+    alerts:
+      - type: discord
+{% endif %}
 
 {% endfor %}
   - name: "Supabase REST API"
@@ -22,6 +37,10 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 3000"
+{% if vault_gatus_discord_webhook is defined %}
+    alerts:
+      - type: discord
+{% endif %}
 
   - name: "Supabase Auth"
     group: supabase
@@ -29,6 +48,10 @@ endpoints:
     interval: 5m
     conditions:
       - "[STATUS] == 200"
+{% if vault_gatus_discord_webhook is defined %}
+    alerts:
+      - type: discord
+{% endif %}
 
   - name: "App Distribution"
     group: distribution
@@ -36,3 +59,25 @@ endpoints:
     interval: 5m
     conditions:
       - "[STATUS] == 200"
+{% if vault_gatus_discord_webhook is defined %}
+    alerts:
+      - type: discord
+{% endif %}
+
+{% for tenant in tenants %}
+{% if tenant.apps is defined %}
+{% for app in tenant.apps %}
+  - name: "{{ app.slug }} APK download"
+    group: distribution
+    url: "https://{{ app_distribution_domain }}/{{ app.slug }}/"
+    interval: 30m
+    conditions:
+      - "[STATUS] == 200"
+{% if vault_gatus_discord_webhook is defined %}
+    alerts:
+      - type: discord
+{% endif %}
+
+{% endfor %}
+{% endif %}
+{% endfor %}

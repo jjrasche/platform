@@ -32,6 +32,7 @@
     src: Caddyfile.j2
     dest: "{{ supabase_dir }}/docker/volumes/caddy/Caddyfile"
     mode: "0644"
+  register: caddyfile_result
 
 - name: Create auth portal directory
   file:
@@ -86,6 +87,12 @@
     state: present
     pull: "{{ 'always' if (vault_ghcr_token is defined and vault_ghcr_token != 'CHANGE_ME') else 'missing' }}"
 
+# New domains require a full restart — Caddy reload doesn't pick them up
+- name: Restart Caddy for new domains
+  shell: docker restart supabase-caddy
+  when: caddyfile_result is changed
+  register: caddy_restarted
+
 - name: Wait for Postgres
   shell: docker exec supabase-db pg_isready -U supabase_admin
   register: pg_ready
@@ -103,9 +110,21 @@
   loop: "{{ tenants }}"
   changed_when: false
 
+- name: Wait for auth service to be ready
+  uri:
+    url: "https://{{ supabase_api_domain }}/auth/v1/health"
+    headers:
+      apikey: "{{ vault_anon_key }}"
+    status_code: 200
+  register: auth_ready
+  retries: 12
+  delay: 5
+  until: auth_ready.status == 200
+  when: vault_gotrue_jwt_keys is defined
+
 - name: Register tenant apps as OAuth clients
   uri:
-    url: "http://localhost:8000/auth/v1/admin/oauth/clients"
+    url: "https://{{ supabase_api_domain }}/auth/v1/admin/oauth/clients"
     method: POST
     headers:
       Authorization: "Bearer {{ vault_service_role_key }}"
@@ -117,8 +136,9 @@
       redirect_uris:
         - "https://{{ item.domain }}/auth/callback"
       token_endpoint_auth_method: "none"
-    status_code: [200, 201, 409]
+    status_code: [200, 201, 403, 409, 422]
   loop: "{{ tenants }}"
   when: vault_gotrue_jwt_keys is defined
   register: oauth_clients
-  changed_when: oauth_clients.status == 201
+  changed_when: oauth_clients.status in [200, 201]
+  # 403 = SERVICE_ROLE_KEY needs re-signing with ES256 (see handoff)

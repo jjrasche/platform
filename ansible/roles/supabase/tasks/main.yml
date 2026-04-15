@@ -33,6 +33,46 @@
     dest: "{{ supabase_dir }}/docker/volumes/caddy/Caddyfile"
     mode: "0644"
 
+- name: Create auth portal directory
+  file:
+    path: /opt/auth-portal
+    state: directory
+    mode: "0755"
+
+- name: Deploy auth portal files
+  copy:
+    src: "{{ playbook_dir }}/../portal/"
+    dest: /opt/auth-portal/
+    mode: "0644"
+
+- name: Template auth portal config with anon key
+  template:
+    src: portal-config.js.j2
+    dest: /opt/auth-portal/config.js
+    mode: "0644"
+
+- name: Check if JWKS route exists in Kong config
+  command: grep -q 'auth-v1-open-jwks' "{{ supabase_dir }}/docker/volumes/api/kong.yml"
+  register: jwks_route_check
+  failed_when: false
+  changed_when: false
+  when: vault_gotrue_jwt_keys is defined
+
+- name: Add JWKS route to Kong config
+  shell: |
+    cat >> "{{ supabase_dir }}/docker/volumes/api/kong.yml" <<'EOF'
+      - name: auth-v1-open-jwks
+        url: http://auth:9999/.well-known/jwks.json
+        routes:
+          - name: auth-v1-open-jwks
+            strip_path: true
+            paths:
+              - /auth/v1/.well-known/jwks.json
+        plugins:
+          - name: cors
+    EOF
+  when: vault_gotrue_jwt_keys is defined and jwks_route_check.rc != 0
+
 - name: Login to GHCR
   community.docker.docker_login:
     registry: ghcr.io
@@ -62,3 +102,23 @@
       "CREATE DATABASE {{ item.database }}"
   loop: "{{ tenants }}"
   changed_when: false
+
+- name: Register tenant apps as OAuth clients
+  uri:
+    url: "http://localhost:8000/auth/v1/admin/oauth/clients"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ vault_service_role_key }}"
+      apikey: "{{ vault_service_role_key }}"
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      name: "{{ item.name }}"
+      redirect_uris:
+        - "https://{{ item.domain }}/auth/callback"
+      token_endpoint_auth_method: "none"
+    status_code: [200, 201, 409]
+  loop: "{{ tenants }}"
+  when: vault_gotrue_jwt_keys is defined
+  register: oauth_clients
+  changed_when: oauth_clients.status == 201

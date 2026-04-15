@@ -20,6 +20,11 @@
 {{ monitoring_domain }} {
     reverse_proxy gatus:8080
 }
+{{ auth_domain }} {
+    root * /opt/auth-portal
+    try_files {path} /index.html
+    file_server
+}
 {{ supabase_api_domain }} {
     handle /rest/v1/* {
         reverse_proxy kong:8000

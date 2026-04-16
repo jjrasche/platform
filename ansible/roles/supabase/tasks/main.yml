@@ -123,6 +123,43 @@
   register: agent_migration
   changed_when: "'CREATE TABLE' in agent_migration.stdout"
 
+- name: Copy unified memory migration from unified-memory repo
+  copy:
+    src: "{{ playbook_dir }}/../../unified-memory/migrations/001_memory_schema.sql"
+    dest: /tmp/001_memory_schema.sql
+    mode: "0644"
+
+- name: Run unified memory schema migration
+  shell: |
+    docker exec -i supabase-db psql -U supabase_admin -d postgres \
+      < /tmp/001_memory_schema.sql
+  register: memory_migration
+  changed_when: "'CREATE TABLE' in memory_migration.stdout"
+
+- name: Copy storage buckets migration to remote
+  copy:
+    src: migrations/004_storage_buckets.sql
+    dest: /tmp/004_storage_buckets.sql
+    mode: "0644"
+
+- name: Run storage buckets migration
+  shell: |
+    docker exec -i supabase-db psql -U supabase_admin -d postgres \
+      < /tmp/004_storage_buckets.sql
+  register: storage_migration
+  changed_when: "'INSERT' in storage_migration.stdout"
+
+- name: Deploy mint-agent-token Edge Function
+  copy:
+    src: functions/mint-agent-token/
+    dest: "{{ supabase_dir }}/docker/volumes/functions/mint-agent-token/"
+    mode: "0644"
+  register: edge_function_deployed
+
+- name: Restart Edge Functions container for new function
+  shell: docker restart $(docker ps --format '{% raw %}{{.Names}}{% endraw %}' | grep functions)
+  when: edge_function_deployed is changed
+
 - name: Wait for auth service to be ready
   uri:
     url: "https://{{ supabase_api_domain }}/auth/v1/health"

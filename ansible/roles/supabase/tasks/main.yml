@@ -110,6 +110,19 @@
   loop: "{{ tenants }}"
   changed_when: false
 
+- name: Copy agent migration to remote
+  copy:
+    src: migrations/003_agent_tables.sql
+    dest: /tmp/003_agent_tables.sql
+    mode: "0644"
+
+- name: Run agent tables migration
+  shell: |
+    docker exec -i supabase-db psql -U supabase_admin -d postgres \
+      < /tmp/003_agent_tables.sql
+  register: agent_migration
+  changed_when: "'CREATE TABLE' in agent_migration.stdout"
+
 - name: Wait for auth service to be ready
   uri:
     url: "https://{{ supabase_api_domain }}/auth/v1/health"

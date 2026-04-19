@@ -9,7 +9,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VAULT_FILE="$REPO_ROOT/ansible/inventory/group_vars/all/vault.yml"
-VAULT_PASS_FILE="${VAULT_PASS_FILE:-/home/jrasche/.vault_pass}"
+VAULT_PASS_FILE="${VAULT_PASS_FILE:-$HOME/.ansible-vault/platform}"
 
 if [ ! -f "$VAULT_FILE" ]; then
   echo "ERROR: vault.yml not found at $VAULT_FILE"

@@ -40,6 +40,11 @@ on:
         required: true
         type: string
         description: "Minimum supported version (for forced upgrades)"
+      kind:
+        required: false
+        type: string
+        default: "expo"
+        description: "'expo' runs npx expo prebuild (existing Expo apps). 'native' skips it for pure-Kotlin Android projects."
     secrets:
       KEYSTORE_BASE64:
         required: true
@@ -70,11 +75,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        if: inputs.kind == 'expo'
         with:
           node-version: '20'
           cache: npm
 
-      - name: Install dependencies
+      - name: Install JS dependencies
+        if: inputs.kind == 'expo'
         run: npm ci
         working-directory: .
 
@@ -93,17 +100,29 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
-      - name: Generate native project
+      - name: Generate native project (Expo)
+        if: inputs.kind == 'expo'
         run: npx expo prebuild --platform android --no-install
 
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.jks
 
-      - name: Build signed APK
+      - name: Build signed APK (Expo)
+        if: inputs.kind == 'expo'
         run: |
           cd android
           chmod +x ./gradlew
           ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=/tmp/release.jks \
+            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
+
+      - name: Build signed APK (native Kotlin)
+        if: inputs.kind == 'native'
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app:assembleRelease \
             -Pandroid.injected.signing.store.file=/tmp/release.jks \
             -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
             -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
@@ -114,9 +133,17 @@ jobs:
         run: rm -f /tmp/release.jks
 
       - uses: actions/upload-artifact@v4
+        if: inputs.kind == 'expo'
         with:
           name: signed-apk
           path: ${{ inputs.app_dir }}/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        if: inputs.kind == 'native'
+        with:
+          name: signed-apk
+          path: ${{ inputs.app_dir }}/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
 
   upload:

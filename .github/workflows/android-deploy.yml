@@ -77,12 +77,12 @@ jobs:
       - uses: actions/setup-node@v4
         if: inputs.kind == 'expo'
         with:
-          node-version: '20'
+          node-version: '20.19.0'
           cache: npm
 
       - name: Install JS dependencies
         if: inputs.kind == 'expo'
-        run: npm ci
+        run: npm install --no-audit --no-fund
         working-directory: .
 
       - uses: actions/setup-java@v4

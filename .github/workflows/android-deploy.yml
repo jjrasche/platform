@@ -100,10 +100,10 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
-      - name: Install NDK 26 (avoid NDK 27 C++20 concepts regression)
+      - name: Install NDK 27 (complete <concepts> header for reanimated C++20)
         run: |
-          echo "y" | sdkmanager "ndk;26.1.10909125"
-          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
+          echo "y" | sdkmanager "ndk;27.2.12479018"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> $GITHUB_ENV
 
       - name: Generate native project (Expo)
         if: inputs.kind == 'expo'

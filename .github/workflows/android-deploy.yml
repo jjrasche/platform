@@ -109,6 +109,10 @@ jobs:
         if: inputs.kind == 'expo'
         run: npx expo prebuild --platform android --no-install
 
+      - name: Override ndkVersion in generated build.gradle (Expo)
+        if: inputs.kind == 'expo'
+        run: sed -i 's/ndkVersion = "26\.1\.10909125"/ndkVersion = "27.2.12479018"/' android/build.gradle
+
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.jks
 

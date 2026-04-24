@@ -115,9 +115,10 @@ jobs:
 
       - name: Make hermesc executable (npm strips +x bits on some platforms)
         if: inputs.kind == 'expo'
+        working-directory: ${{ github.workspace }}
         run: |
-          chmod +x ../../node_modules/react-native/sdks/hermesc/linux64-bin/hermesc || true
-          chmod +x node_modules/react-native/sdks/hermesc/linux64-bin/hermesc 2>/dev/null || true
+          find . -path '*react-native/sdks/hermesc/linux64-bin/hermesc' -exec chmod +x {} \;
+          find . -path '*react-native/sdks/hermesc/linux64-bin/hermesc' -exec ls -la {} \;
 
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.jks

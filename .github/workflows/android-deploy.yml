@@ -113,6 +113,12 @@ jobs:
         if: inputs.kind == 'expo'
         run: sed -i 's/ndkVersion = "26\.1\.10909125"/ndkVersion = "27.2.12479018"/' android/build.gradle
 
+      - name: Make hermesc executable (npm strips +x bits on some platforms)
+        if: inputs.kind == 'expo'
+        run: |
+          chmod +x ../../node_modules/react-native/sdks/hermesc/linux64-bin/hermesc || true
+          chmod +x node_modules/react-native/sdks/hermesc/linux64-bin/hermesc 2>/dev/null || true
+
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.jks
 

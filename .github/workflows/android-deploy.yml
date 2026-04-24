@@ -100,6 +100,11 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
+      - name: Install NDK 26 (avoid NDK 27 C++20 concepts regression)
+        run: |
+          echo "y" | sdkmanager "ndk;26.1.10909125"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
+
       - name: Generate native project (Expo)
         if: inputs.kind == 'expo'
         run: npx expo prebuild --platform android --no-install

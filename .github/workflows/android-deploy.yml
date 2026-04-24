@@ -113,12 +113,19 @@ jobs:
         if: inputs.kind == 'expo'
         run: sed -i 's/ndkVersion = "26\.1\.10909125"/ndkVersion = "27.2.12479018"/' android/build.gradle
 
-      - name: Make hermesc executable (npm strips +x bits on some platforms)
+      - name: Stage hermesc where RN gradle plugin expects it
         if: inputs.kind == 'expo'
         working-directory: ${{ github.workspace }}
         run: |
-          find . -path '*react-native/sdks/hermesc/linux64-bin/hermesc' -exec chmod +x {} \;
-          find . -path '*react-native/sdks/hermesc/linux64-bin/hermesc' -exec ls -la {} \;
+          # RN 0.83 ships hermesc in node_modules/hermes-compiler/ but the RN
+          # gradle plugin looks at node_modules/react-native/sdks/hermesc/.
+          # Copy the Linux binary into the expected location.
+          SRC="node_modules/hermes-compiler/hermesc/linux64-bin/hermesc"
+          DST="node_modules/react-native/sdks/hermesc/linux64-bin/hermesc"
+          mkdir -p "$(dirname "$DST")"
+          cp "$SRC" "$DST"
+          chmod +x "$DST"
+          ls -la "$DST"
 
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.jks

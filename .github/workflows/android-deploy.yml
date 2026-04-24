@@ -109,10 +109,6 @@ jobs:
         if: inputs.kind == 'expo'
         run: npx expo prebuild --platform android --no-install
 
-      - name: Override ndkVersion in generated build.gradle (Expo)
-        if: inputs.kind == 'expo'
-        run: sed -i 's/ndkVersion = "26\.1\.10909125"/ndkVersion = "27.2.12479018"/' android/build.gradle
-
       - name: Stage hermesc where RN gradle plugin expects it
         if: inputs.kind == 'expo'
         working-directory: ${{ github.workspace }}

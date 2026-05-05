@@ -1,0 +1,92 @@
+---
+# Deploy Luanti (Minetest) game server with Mineclonia
+
+- name: Create Luanti directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ luanti_dir }}"
+    - "{{ luanti_dir }}/data"
+    - "{{ luanti_dir }}/data/games"
+    - "{{ luanti_dir }}/data/worlds"
+
+- name: Check if Mineclonia is installed
+  stat:
+    path: "{{ luanti_dir }}/data/games/mineclonia"
+  register: mineclonia_check
+
+- name: Download Mineclonia from ContentDB
+  unarchive:
+    src: "https://content.luanti.org/packages/ryvnf/mineclonia/releases/{{ luanti_mineclonia_release_id }}/download/"
+    dest: "{{ luanti_dir }}/data/games/"
+    remote_src: true
+  when: not mineclonia_check.stat.exists
+
+- name: Rename Mineclonia directory if needed
+  shell: |
+    cd {{ luanti_dir }}/data/games/
+    if [ ! -d mineclonia ] && ls -d mineclonia* 2>/dev/null | head -1; then
+      mv $(ls -d mineclonia* | head -1) mineclonia
+    fi
+  when: not mineclonia_check.stat.exists
+  changed_when: false
+
+- name: Create mods directory
+  file:
+    path: "{{ luanti_dir }}/data/mods"
+    state: directory
+    mode: "0755"
+
+- name: Check which mods are installed
+  stat:
+    path: "{{ luanti_dir }}/data/mods/{{ item.name }}"
+  loop: "{{ luanti_mods }}"
+  register: mod_checks
+
+- name: Download mods from ContentDB
+  unarchive:
+    src: "https://content.luanti.org/packages/{{ item.item.author }}/{{ item.item.name }}/releases/{{ item.item.release_id }}/download/"
+    dest: "{{ luanti_dir }}/data/mods/"
+    remote_src: true
+  loop: "{{ mod_checks.results }}"
+  when: not item.stat.exists
+
+- name: Template Luanti server config
+  template:
+    src: luanti.conf.j2
+    dest: "{{ luanti_dir }}/data/minetest.conf"
+    mode: "0644"
+  register: luanti_config
+
+- name: Create world directory
+  file:
+    path: "{{ luanti_dir }}/data/worlds/neighborhood"
+    state: directory
+    mode: "0755"
+
+- name: Template world config
+  template:
+    src: world.mt.j2
+    dest: "{{ luanti_dir }}/data/worlds/neighborhood/world.mt"
+    mode: "0644"
+
+- name: Template docker-compose for Luanti
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ luanti_dir }}/docker-compose.yml"
+    mode: "0644"
+  register: luanti_compose
+
+- name: Start Luanti server
+  community.docker.docker_compose_v2:
+    project_src: "{{ luanti_dir }}"
+    state: present
+    pull: missing
+
+- name: Restart Luanti if config changed
+  community.docker.docker_compose_v2:
+    project_src: "{{ luanti_dir }}"
+    state: restarted
+  when: luanti_compose is changed or luanti_config is changed

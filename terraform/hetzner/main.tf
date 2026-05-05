@@ -111,6 +111,13 @@ resource "hcloud_firewall" "platform" {
     port       = "443"
     source_ips = local.cloudflare_ips
   }
+
+  rule {
+    direction  = "in"
+    protocol   = "udp"
+    port       = "30000"
+    source_ips = ["0.0.0.0/0", "::/0"]
+  }
 }
 
 resource "hcloud_server" "platform" {
@@ -147,6 +154,17 @@ resource "cloudflare_zone_settings_override" "jimr_fyi" {
       preload            = true
     }
   }
+}
+
+# --- Luanti game server DNS (UDP — cannot be proxied) ---
+
+resource "cloudflare_record" "play" {
+  zone_id = var.cloudflare_zone_id
+  name    = "play"
+  content = hcloud_server.platform.ipv4_address
+  type    = "A"
+  proxied = false
+  ttl     = 300
 }
 
 # --- Outputs ---

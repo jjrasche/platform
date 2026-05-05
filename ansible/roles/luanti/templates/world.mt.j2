@@ -1,0 +1,7 @@
+gameid = mineclonia
+backend = sqlite3
+creative_mode = false
+enable_damage = true
+{% for mod in luanti_mods %}
+load_mod_{{ mod.name }} = true
+{% endfor %}

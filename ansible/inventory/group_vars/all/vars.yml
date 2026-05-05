@@ -14,6 +14,33 @@ auth_domain: auth.jimr.fyi
 apk_retention_count: 5
 ci_deploy_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPMpe8/hgmlj+2Nlvymf8iWxBnNzaIBUyPkDtJvz2+R6 ci-deploy@platform"
 
+# Luanti game server
+luanti_dir: /opt/luanti
+luanti_image_tag: "5.16.0"
+luanti_mineclonia_release_id: "35899"
+luanti_server_name: "Eagle Crest"
+luanti_server_description: "Neighborhood survival server — Eagle Crest community"
+luanti_motd: "Welcome to Eagle Crest! Be kind, build cool stuff."
+luanti_max_players: 20
+luanti_enable_pvp: true
+
+luanti_mods:
+  - name: protector
+    author: TenPlus1
+    release_id: "35096"
+  - name: worldgate
+    author: EmptyStar
+    release_id: "31097"
+  - name: enderpearl
+    author: giov4
+    release_id: "32185"
+  - name: x_bows
+    author: SaKeL
+    release_id: "30547"
+  - name: zoonami
+    author: isaiah658
+    release_id: "35031"
+
 # Tenant list — add new apps here
 # Each tenant has its own domain (subdomain of primary or standalone)
 # Apps with mobile builds get an `apps` list with slug only;

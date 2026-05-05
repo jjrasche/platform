@@ -1,0 +1,14 @@
+services:
+  luanti:
+    image: lscr.io/linuxserver/luanti:{{ luanti_image_tag }}
+    container_name: luanti-server
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Detroit
+      - CLI_ARGS=--gameid mineclonia --worldname neighborhood
+    ports:
+      - "30000:30000/udp"
+    volumes:
+      - {{ luanti_dir }}/data:/config/.minetest

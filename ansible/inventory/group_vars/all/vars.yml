@@ -69,3 +69,14 @@ tenants:
     domain: minecraft.jimr.fyi
     database: minecraft_companion
     repo: minecraft-companion
+
+  # dungeon-master uses the shared `postgres` DB (per D13) for cross-schema
+  # FKs to auth.users — no per-tenant database is created.
+  - name: dungeon-master
+    domain: dm.jimr.fyi
+    repo: dungeon-master
+
+# Dungeon Master app
+dungeon_master_dir: /opt/dungeon-master
+dungeon_master_static_dir: /var/www/dungeon-master
+dungeon_master_image: ghcr.io/jjrasche/dungeon-master-backend:0.1.1@sha256:887d3dbd480df6c582427f8448f69384f05828097fb8d4211f9ff2418967fb49

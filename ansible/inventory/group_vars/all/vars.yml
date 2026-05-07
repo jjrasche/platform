@@ -79,4 +79,4 @@ tenants:
 # Dungeon Master app
 dungeon_master_dir: /opt/dungeon-master
 dungeon_master_static_dir: /var/www/dungeon-master
-dungeon_master_image: ghcr.io/jjrasche/dungeon-master-backend:0.1.2@sha256:642f471b4abe8276d5f8a6796bdc6e064b459a679b927211ab83a10ab3048d41
+dungeon_master_image: ghcr.io/jjrasche/dungeon-master-backend:0.1.4@sha256:23629680b005e4d384d4c8da11e65931f1918ea15c8057793f77fb3223574554

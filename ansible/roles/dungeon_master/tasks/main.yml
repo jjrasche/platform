@@ -1,4 +1,3 @@
----
 # Deploy dungeon-master backend (FastAPI) + factored-ui wasm static client.
 # Depends on supabase role having applied the dm schema migration to the
 # shared `postgres` database (per D13 — co-located with auth.users so
@@ -73,6 +72,14 @@
     docker exec supabase-db psql -U supabase_admin -d postgres -c \
       "GRANT USAGE ON SCHEMA auth TO dm_app; \
        GRANT SELECT, REFERENCES ON auth.users TO dm_app;"
+  changed_when: false
+
+- name: Grant dm_app BYPASSRLS
+  # auth.uid() = NULL for direct asyncpg connections (not through GoTrue/PostgREST).
+  # Without BYPASSRLS every RLS policy denies the backend's queries.
+  shell: |
+    docker exec supabase-db psql -U supabase_admin -d postgres -c \
+      "ALTER ROLE dm_app BYPASSRLS"
   changed_when: false
 
 - name: Login to GHCR for dungeon-master image

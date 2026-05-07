@@ -69,3 +69,13 @@ tenants:
     domain: minecraft.jimr.fyi
     database: minecraft_companion
     repo: minecraft-companion
+
+  - name: dungeon-master
+    domain: dm.jimr.fyi
+    database: dungeon_master
+    repo: dungeon-master
+
+# Dungeon Master app
+dungeon_master_dir: /opt/dungeon-master
+dungeon_master_static_dir: /var/www/dungeon-master
+dungeon_master_image: ghcr.io/jjrasche/dungeon-master-backend:0.1.0

@@ -20,3 +20,8 @@ vault_logflare_private_key: "CHANGE_ME"
 vault_s3_access_key_id: "CHANGE_ME"
 vault_s3_access_key_secret: "CHANGE_ME"
 vault_hcloud_token: "CHANGE_ME"
+
+# dungeon-master deploy
+vault_dm_db_password: "CHANGE_ME"
+vault_ghcr_token: "CHANGE_ME"
+vault_anthropic_api_key: "CHANGE_ME"

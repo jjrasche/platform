@@ -1,5 +1,5 @@
 services:
-{% for tenant in tenants %}
+{% for tenant in tenants if tenant.name != 'dungeon-master' %}
   frontend-{{ tenant.name }}:
     image: ghcr.io/jjrasche/{{ tenant.repo }}:latest
     restart: unless-stopped
@@ -54,10 +54,12 @@ services:
       - caddy_config:/config
       - /opt/app-dist:/opt/app-dist:ro
       - /opt/auth-portal:/opt/auth-portal:ro
+      - /var/www/dungeon-master:/var/www/dungeon-master:ro
+      - /var/log/caddy:/var/log/caddy
     depends_on:
       - kong
       - gatus
-{% for tenant in tenants %}
+{% for tenant in tenants if tenant.name != 'dungeon-master' %}
       - frontend-{{ tenant.name }}
 {% endfor %}
     networks:

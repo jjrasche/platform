@@ -40,6 +40,34 @@
       - postgresql-client
     state: present
 
+- name: Check if swap file exists
+  stat:
+    path: /swapfile
+  register: swap_stat
+
+- name: Allocate 4 GB swap file
+  command: fallocate -l 4G /swapfile
+  when: not swap_stat.stat.exists
+
+- name: Restrict swap file permissions
+  file:
+    path: /swapfile
+    mode: "0600"
+
+- name: Format swap file
+  command: mkswap /swapfile
+  when: not swap_stat.stat.exists
+
+- name: Persist swap in /etc/fstab
+  lineinfile:
+    path: /etc/fstab
+    line: "/swapfile none swap sw 0 0"
+    state: present
+
+- name: Activate swap if not already enabled
+  command: swapon /swapfile
+  when: ansible_swaptotal_mb | int < 100
+
 - name: Add Docker GPG key
   ansible.builtin.get_url:
     url: https://download.docker.com/linux/ubuntu/gpg

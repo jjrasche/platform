@@ -6,7 +6,7 @@ services:
     environment:
       ANTHROPIC_API_KEY: "{{ vault_anthropic_api_key }}"
       DM_MODEL: claude-haiku-4-5-20251001
-      DATABASE_URL: "postgresql://dm_app:{{ vault_dm_db_password }}@supabase-db:5432/dungeon_master"
+      DATABASE_URL: "postgresql://dm_app:{{ vault_dm_db_password }}@supabase-db:5432/postgres"
       SUPABASE_URL: "https://{{ supabase_api_domain }}"
       SUPABASE_ANON_KEY: "{{ vault_anon_key }}"
       SUPABASE_SERVICE_ROLE_KEY: "{{ vault_service_role_key }}"

@@ -1,7 +1,8 @@
 ---
 # Deploy dungeon-master backend (FastAPI) + factored-ui wasm static client.
-# Depends on supabase role having created the `dungeon_master` database
-# and applied the schema migration.
+# Depends on supabase role having applied the dm schema migration to the
+# shared `postgres` database (per D13 — co-located with auth.users so
+# cross-schema FKs work).
 
 - name: Create dungeon-master compose directory
   file:
@@ -46,20 +47,32 @@
   changed_when: false
   no_log: true
 
-- name: Grant dm_app access to dungeon_master database
+- name: Grant dm_app connect on shared postgres database
+  # Per D13 the dm schema lives in the shared `postgres` DB, not a
+  # dedicated tenant DB.
   shell: |
     docker exec supabase-db psql -U supabase_admin -d postgres -c \
-      "GRANT CONNECT ON DATABASE dungeon_master TO dm_app"
+      "GRANT CONNECT ON DATABASE postgres TO dm_app"
   changed_when: false
 
-- name: Grant dm_app schema usage on dm schema
+- name: Grant dm_app schema usage on dm schema in postgres DB
   shell: |
-    docker exec supabase-db psql -U supabase_admin -d dungeon_master -c \
+    docker exec supabase-db psql -U supabase_admin -d postgres -c \
       "GRANT USAGE ON SCHEMA dm TO dm_app; \
        GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA dm TO dm_app; \
        GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA dm TO dm_app; \
        ALTER DEFAULT PRIVILEGES IN SCHEMA dm GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO dm_app; \
        ALTER DEFAULT PRIVILEGES IN SCHEMA dm GRANT USAGE, SELECT ON SEQUENCES TO dm_app;"
+  changed_when: false
+
+- name: Grant dm_app read access to auth.users for FK validation
+  # FKs from dm.campaigns.owner_id and dm.players.user_id reference
+  # auth.users(id). Postgres requires REFERENCES privilege on the parent
+  # table for the FK constraint to be enforced when dm_app inserts rows.
+  shell: |
+    docker exec supabase-db psql -U supabase_admin -d postgres -c \
+      "GRANT USAGE ON SCHEMA auth TO dm_app; \
+       GRANT SELECT, REFERENCES ON auth.users TO dm_app;"
   changed_when: false
 
 - name: Login to GHCR for dungeon-master image

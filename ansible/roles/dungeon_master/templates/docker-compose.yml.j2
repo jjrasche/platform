@@ -4,8 +4,8 @@ services:
     container_name: dungeon-master-backend
     restart: unless-stopped
     environment:
-      ANTHROPIC_API_KEY: "{{ vault_anthropic_api_key }}"
-      DM_MODEL: claude-haiku-4-5-20251001
+      GROQ_API_KEY: "{{ vault_groq_api_key }}"
+      DM_MODEL: llama-3.3-70b-versatile
       DATABASE_URL: "postgresql://dm_app:{{ vault_dm_db_password }}@supabase-db:5432/postgres"
       SUPABASE_URL: "https://{{ supabase_api_domain }}"
       SUPABASE_ANON_KEY: "{{ vault_anon_key }}"

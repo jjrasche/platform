@@ -72,11 +72,9 @@ tenants:
 
   # dungeon-master uses the shared `postgres` DB (per D13) for cross-schema
   # FKs to auth.users — no per-tenant database is created.
+  # The container itself self-deploys via dungeon-master's GitHub Actions
+  # workflow (~/.claude/references/github-actions-vps-deploy.md). Platform
+  # owns: Caddy reverse proxy, schema migration, OAuth client registration.
   - name: dungeon-master
     domain: dm.jimr.fyi
     repo: dungeon-master
-
-# Dungeon Master app
-dungeon_master_dir: /opt/dungeon-master
-dungeon_master_static_dir: /var/www/dungeon-master
-dungeon_master_image: ghcr.io/jjrasche/dungeon-master-backend:0.1.4@sha256:23629680b005e4d384d4c8da11e65931f1918ea15c8057793f77fb3223574554

@@ -137,31 +137,6 @@
   register: memory_migration
   changed_when: "'CREATE TABLE' in memory_migration.stdout"
 
-- name: Enable extensions for dungeon-master in postgres database
-  # Per D13 the dm schema lives in `postgres` so cross-schema FKs to
-  # auth.users resolve. uuid-ossp + vector are likely already enabled
-  # (unified-memory uses them) but IF NOT EXISTS keeps this idempotent.
-  shell: |
-    docker exec supabase-db psql -U supabase_admin -d postgres -c \
-      "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"; CREATE EXTENSION IF NOT EXISTS vector;"
-  register: dm_extensions
-  changed_when: "'CREATE EXTENSION' in dm_extensions.stdout"
-
-- name: Copy dungeon-master migration from sibling repo
-  copy:
-    src: "{{ playbook_dir }}/../../dungeon-master/supabase/migrations/0001_initial_schema.sql"
-    dest: /tmp/dm_0001_initial_schema.sql
-    mode: "0644"
-
-- name: Run dungeon-master schema migration on postgres DB
-  # Targets `postgres` (D13) — the schema name `dm` provides the namespace,
-  # FKs to auth.users and the supabase_realtime publication line both resolve.
-  shell: |
-    docker exec -i supabase-db psql -U supabase_admin -d postgres \
-      < /tmp/dm_0001_initial_schema.sql
-  register: dm_migration
-  changed_when: "'CREATE TABLE' in dm_migration.stdout"
-
 - name: Copy storage buckets migration to remote
   copy:
     src: migrations/004_storage_buckets.sql

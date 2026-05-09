@@ -428,54 +428,11 @@
   register: oauth_clients
   changed_when: oauth_clients.status in [200, 201]
 
-# Gitea OIDC registration. We can't use GoTrue's admin /oauth/clients endpoint
-# (it rejects HS256 service_role_key with "signing method HS256 is invalid"
-# even when GOTRUE_JWT_VALID_METHODS includes HS256). Insert directly into
-# auth.oauth_clients with an idempotent ON CONFLICT, using stable client_id
-# + bcrypt-hashed secret from vault.
-- name: Generate bcrypt hash of Gitea OIDC client secret
-  shell: |
-    docker run --rm caddy:2-alpine caddy hash-password \
-      --plaintext "{{ vault_gitea_oauth_client_secret }}"
-  register: gitea_secret_hash
-  changed_when: false
-  when: oauth_server_enabled and vault_gitea_oauth_client_id is defined
-
-- name: Upsert Gitea OAuth client in auth.oauth_clients
-  shell: |
-    docker exec -i supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 <<'SQL'
-    INSERT INTO auth.oauth_clients (
-      id, client_secret_hash, registration_type, redirect_uris, grant_types,
-      client_name, token_endpoint_auth_method, client_type
-    ) VALUES (
-      '{{ vault_gitea_oauth_client_id }}'::uuid,
-      '{{ gitea_secret_hash.stdout }}',
-      'manual',
-      'https://{{ gitea_domain }}/user/oauth2/platform-sso/callback',
-      'authorization_code refresh_token',
-      'gitea',
-      'client_secret_post',
-      'confidential'
-    ) ON CONFLICT (id) DO NOTHING;
-    SQL
-  register: gitea_client_upsert
-  changed_when: "'INSERT 0 1' in gitea_client_upsert.stdout"
-  when: oauth_server_enabled and vault_gitea_oauth_client_id is defined
-
-- name: Configure Gitea OIDC source from GoTrue
-  shell: |
-    if docker exec -u git supabase-gitea-1 gitea admin auth list 2>&1 | grep -q "platform-sso"; then
-      exit 0
-    fi
-    docker exec -u git supabase-gitea-1 gitea admin auth add-oauth \
-      --name "platform-sso" \
-      --provider openidConnect \
-      --key "{{ vault_gitea_oauth_client_id }}" \
-      --secret "{{ vault_gitea_oauth_client_secret }}" \
-      --auto-discover-url "https://{{ supabase_api_domain }}/auth/v1/.well-known/openid-configuration" \
-      --scopes "openid email"
-  when: oauth_server_enabled and vault_gitea_oauth_client_id is defined
-  changed_when: false
+# Gitea is on local auth — its OIDC client (goth's openidConnect provider as of
+# v1.25) doesn't send PKCE, and supabase-auth requires it for OAuth 2.1
+# compliance. The V1.3 OIDC infrastructure (above) is ready for any
+# PKCE-capable client (Grafana, Vaultwarden, etc.); see docs/sso-oidc-pattern.md
+# for the registration recipe.
 
 # End-of-deploy verification — actually exercise the user-facing surfaces
 # we just changed. Failing here means deploy didn't reach the user, even if

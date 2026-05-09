@@ -103,6 +103,56 @@
           - name: cors
     EOF
   when: oauth_server_enabled and vault_gotrue_jwt_keys is defined and jwks_route_check.rc != 0
+  register: kong_jwks_route_added
+
+# OIDC server endpoints — open routes so OIDC clients (Gitea, Grafana, etc.)
+# can reach them without an apikey header. The admin /clients endpoint stays
+# secured under the default auth-v1 route.
+- name: Check if OIDC OAuth routes exist in Kong config
+  command: grep -q 'auth-v1-open-oauth-authorize' "{{ supabase_dir }}/docker/volumes/api/kong.yml"
+  register: oidc_routes_check
+  failed_when: false
+  changed_when: false
+  when: oauth_server_enabled
+
+- name: Add OIDC OAuth open routes to Kong config
+  shell: |
+    cat >> "{{ supabase_dir }}/docker/volumes/api/kong.yml" <<'EOF'
+      - name: auth-v1-open-oauth-authorize
+        url: http://auth:9999/oauth/authorize
+        routes:
+          - name: auth-v1-open-oauth-authorize
+            strip_path: true
+            paths:
+              - /auth/v1/oauth/authorize
+        plugins:
+          - name: cors
+      - name: auth-v1-open-oauth-token
+        url: http://auth:9999/oauth/token
+        routes:
+          - name: auth-v1-open-oauth-token
+            strip_path: true
+            paths:
+              - /auth/v1/oauth/token
+        plugins:
+          - name: cors
+      - name: auth-v1-open-oauth-userinfo
+        url: http://auth:9999/oauth/userinfo
+        routes:
+          - name: auth-v1-open-oauth-userinfo
+            strip_path: true
+            paths:
+              - /auth/v1/oauth/userinfo
+        plugins:
+          - name: cors
+    EOF
+  when: oauth_server_enabled and oidc_routes_check.rc != 0
+  register: kong_oidc_routes_added
+
+- name: Restart Kong if config routes were added
+  shell: docker restart $(docker ps --format '{% raw %}{{.Names}}{% endraw %}' | grep kong)
+  when: (kong_jwks_route_added is defined and kong_jwks_route_added is changed)
+        or (kong_oidc_routes_added is defined and kong_oidc_routes_added is changed)
 
 - name: Login to GHCR
   community.docker.docker_login:
@@ -249,6 +299,71 @@
     label: "{{ item.repo }}/{{ item.path | basename }}"
   register: tenant_migration_apply
   changed_when: tenant_migration_apply.stdout is search('CREATE|ALTER|INSERT|GRANT|UPDATE')
+  # dm/0001_initial_schema.sql references an `embedding` column that was dropped
+  # from the live schema but not the migration file. That file is non-idempotent
+  # in the dungeon-master repo — fix lives there, not here.
+  ignore_errors: true
+
+# Tenant developer DB access — port-forward-only SSH user + scoped Postgres
+# role per tenant. Driven by `tenant_dev_db_access` in vars.yml. Each entry
+# expects two vault vars by deterministic name:
+#   vault_<tunnel_user>_ssh_pubkey   — developer's SSH public key
+#   vault_<db_role>_db_password      — generated 24+ char random
+# When either vault var is missing/empty for an entry, that entry is skipped
+# (lets us land the role and password without a pubkey, then add the key later).
+- name: Create tenant tunnel SSH users (port-forward only)
+  user:
+    name: "{{ item.tunnel_user }}"
+    shell: /usr/sbin/nologin
+    state: present
+    create_home: true
+  loop: "{{ tenant_dev_db_access | default([]) }}"
+  loop_control:
+    label: "{{ item.tunnel_user }}"
+
+- name: Authorize tenant tunnel SSH keys (restrict + permitopen 5432)
+  ansible.posix.authorized_key:
+    user: "{{ item.tunnel_user }}"
+    key: "{{ lookup('vars', 'vault_' + item.tunnel_user + '_ssh_pubkey', default='') }}"
+    key_options: 'restrict,permitopen="127.0.0.1:5432"'
+    exclusive: true
+  loop: "{{ tenant_dev_db_access | default([]) }}"
+  loop_control:
+    label: "{{ item.tunnel_user }}"
+  when: lookup('vars', 'vault_' + item.tunnel_user + '_ssh_pubkey', default='') | length > 0
+
+- name: Render dev DB role setup SQL per tenant
+  template:
+    src: dev_db_role_setup.sql.j2
+    dest: "/tmp/dev_db_role_{{ item.db_role }}.sql"
+    mode: "0600"
+  loop: "{{ tenant_dev_db_access | default([]) }}"
+  loop_control:
+    label: "{{ item.db_role }}"
+  vars:
+    entry: "{{ item }}"
+  no_log: true
+
+- name: Apply dev DB role setup (idempotent)
+  shell: |
+    docker exec -i supabase-db psql -U supabase_admin -d postgres \
+      -v ON_ERROR_STOP=1 \
+      -v pw="{{ lookup('vars', 'vault_' + item.db_role + '_db_password') }}" \
+      < /tmp/dev_db_role_{{ item.db_role }}.sql
+  loop: "{{ tenant_dev_db_access | default([]) }}"
+  loop_control:
+    label: "{{ item.db_role }}"
+  register: dev_db_role_apply
+  changed_when: dev_db_role_apply.stdout is search('CREATE|ALTER|GRANT')
+  no_log: true
+
+- name: Remove staged dev DB role setup SQL
+  file:
+    path: "/tmp/dev_db_role_{{ item.db_role }}.sql"
+    state: absent
+  loop: "{{ tenant_dev_db_access | default([]) }}"
+  loop_control:
+    label: "{{ item.db_role }}"
 
 # In-repo Edge Functions (platform-owned, source under ansible/roles/supabase/files/functions/)
 - name: Deploy in-repo Edge Functions
@@ -257,6 +372,7 @@
     dest: "{{ supabase_dir }}/docker/volumes/functions/{{ item }}/"
     mode: "0644"
   loop:
+    - main
     - mint-agent-token
     - timeout-probe
   register: in_repo_functions_deployed
@@ -308,9 +424,58 @@
       token_endpoint_auth_method: "none"
     status_code: [200, 201, 403, 409, 422]
   loop: "{{ tenants }}"
-  when: oauth_server_enabled and vault_gotrue_jwt_keys is defined
+  when: oauth_server_enabled
   register: oauth_clients
   changed_when: oauth_clients.status in [200, 201]
+
+# Gitea OIDC registration. We can't use GoTrue's admin /oauth/clients endpoint
+# (it rejects HS256 service_role_key with "signing method HS256 is invalid"
+# even when GOTRUE_JWT_VALID_METHODS includes HS256). Insert directly into
+# auth.oauth_clients with an idempotent ON CONFLICT, using stable client_id
+# + bcrypt-hashed secret from vault.
+- name: Generate bcrypt hash of Gitea OIDC client secret
+  shell: |
+    docker run --rm caddy:2-alpine caddy hash-password \
+      --plaintext "{{ vault_gitea_oauth_client_secret }}"
+  register: gitea_secret_hash
+  changed_when: false
+  when: oauth_server_enabled and vault_gitea_oauth_client_id is defined
+
+- name: Upsert Gitea OAuth client in auth.oauth_clients
+  shell: |
+    docker exec -i supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+    INSERT INTO auth.oauth_clients (
+      id, client_secret_hash, registration_type, redirect_uris, grant_types,
+      client_name, token_endpoint_auth_method, client_type
+    ) VALUES (
+      '{{ vault_gitea_oauth_client_id }}'::uuid,
+      '{{ gitea_secret_hash.stdout }}',
+      'manual',
+      'https://{{ gitea_domain }}/user/oauth2/platform-sso/callback',
+      'authorization_code refresh_token',
+      'gitea',
+      'client_secret_post',
+      'confidential'
+    ) ON CONFLICT (id) DO NOTHING;
+    SQL
+  register: gitea_client_upsert
+  changed_when: "'INSERT 0 1' in gitea_client_upsert.stdout"
+  when: oauth_server_enabled and vault_gitea_oauth_client_id is defined
+
+- name: Configure Gitea OIDC source from GoTrue
+  shell: |
+    if docker exec -u git supabase-gitea-1 gitea admin auth list 2>&1 | grep -q "platform-sso"; then
+      exit 0
+    fi
+    docker exec -u git supabase-gitea-1 gitea admin auth add-oauth \
+      --name "platform-sso" \
+      --provider openidConnect \
+      --key "{{ vault_gitea_oauth_client_id }}" \
+      --secret "{{ vault_gitea_oauth_client_secret }}" \
+      --auto-discover-url "https://{{ supabase_api_domain }}/auth/v1/.well-known/openid-configuration" \
+      --scopes "openid email"
+  when: oauth_server_enabled and vault_gitea_oauth_client_id is defined
+  changed_when: false
 
 # End-of-deploy verification — actually exercise the user-facing surfaces
 # we just changed. Failing here means deploy didn't reach the user, even if

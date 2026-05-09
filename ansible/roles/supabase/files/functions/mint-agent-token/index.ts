@@ -6,7 +6,10 @@
 
 import { SignJWT } from "https://deno.land/x/jose@v5.9.6/index.ts";
 
-const JWT_SECRET = Deno.env.get("JWT_SECRET");
+// After the OIDC cutover JWT_SECRET holds a JWKS JSON for runtime validation,
+// not a plain HMAC key. Functions that sign HS256 agent tokens read the legacy
+// shared secret from LEGACY_HS256_SECRET (passed only to the functions container).
+const JWT_SECRET = Deno.env.get("LEGACY_HS256_SECRET") ?? Deno.env.get("JWT_SECRET");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "http://kong:8000";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
@@ -26,7 +29,7 @@ Deno.serve(async (req) => {
   }
 
   if (!JWT_SECRET) {
-    return errorResponse(500, "Server misconfigured: missing JWT_SECRET");
+    return errorResponse(500, "Server misconfigured: missing LEGACY_HS256_SECRET");
   }
 
   const sessionToken = extractBearerToken(req);

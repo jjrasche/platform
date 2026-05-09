@@ -24,7 +24,7 @@ apk_retention_count: 5
 # leave this false — otherwise user JWTs validate at sign-in but fail at
 # every PostgREST RPC and Edge Function call. See implementer's
 # reference_es256_user_jwt_blocker.md for the failure modes.
-oauth_server_enabled: false
+oauth_server_enabled: true
 ci_deploy_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPMpe8/hgmlj+2Nlvymf8iWxBnNzaIBUyPkDtJvz2+R6 ci-deploy@platform"
 
 # Edge Functions sourced from sibling tenant repos. The playbook reads
@@ -43,6 +43,22 @@ tenant_edge_functions:
 # Migrations must be idempotent — they re-run on every playbook apply.
 tenant_db_repos:
   - dungeon-master
+
+# Per-tenant developer DB access for regression suites and fixture work.
+# Each entry creates: a port-forward-only SSH user on VPS1, and a scoped
+# Postgres role with BYPASSRLS on the listed schemas + INSERT/SELECT/DELETE
+# on auth.users (always, for fixture user creation).
+#
+# Onboarding a new tenant: add entry below + ansible-vault edit, set
+# `vault_<tunnel_user>_ssh_pubkey` and `vault_<db_role>_db_password`,
+# then redeploy. See ~/.claude/references/ssh-tunnels.md "platform Postgres".
+#
+# Production tenant code MUST NOT use these roles — they bypass RLS.
+# Production uses platform anon key + user JWTs which respect RLS.
+tenant_dev_db_access:
+  - tunnel_user: dm_tunnel
+    db_role: dm_seeder
+    schemas: [dm]
 
 # Luanti game server
 luanti_dir: /opt/luanti

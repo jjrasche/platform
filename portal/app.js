@@ -1,11 +1,17 @@
 // Login portal for JMR Platform SSO
-// GoTrue OAuth 2.1 Server redirects here for authentication and consent.
+// GoTrue OAuth 2.1 Server delegates user authentication + consent to this
+// portal. GoTrue redirects to /authorize?authorization_id=<id>; the portal
+// signs the user in (if needed) and POSTs the user's JWT back to GoTrue's
+// consent endpoint, which returns the redirect URL carrying the auth code
+// to the OAuth client.
 //
 // Flow:
-// 1. Tenant app redirects to GoTrue /oauth/authorize
-// 2. GoTrue redirects to this portal at /authorize if no session
-// 3. User signs in or signs up via email/password
-// 4. GoTrue sets session cookie, redirects back to tenant app with auth code
+// 1. OIDC client (e.g. Gitea) → GoTrue /oauth/authorize with PKCE params
+// 2. GoTrue → portal /authorize?authorization_id=<id>
+// 3. Portal signs user in if needed, then POST /oauth/authorizations/<id>/consent
+//    with {action:"approve"} and the user's access_token
+// 4. Consent endpoint returns {redirect_to:"https://<client>/callback?code=..."}
+// 5. Portal navigates browser to that URL — client receives auth code
 
 const SUPABASE_URL = "https://api.jimr.fyi";
 const SUPABASE_ANON_KEY = window.__SUPABASE_ANON_KEY__ || "";
@@ -56,14 +62,8 @@ function readReturnTo() {
   }
 }
 
-function parseAuthorizeParams() {
-  const params = new URLSearchParams(window.location.search);
-  const clientId = params.get("client_id");
-  const redirectUri = params.get("redirect_uri");
-  const state = params.get("state");
-  const codeChallenge = params.get("code_challenge");
-  if (!clientId) return null;
-  return { clientId, redirectUri, state, codeChallenge };
+function parseAuthorizationId() {
+  return new URLSearchParams(window.location.search).get("authorization_id");
 }
 
 function isAuthorizePath() {
@@ -84,14 +84,19 @@ async function createSupabaseClient() {
   }
   return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
-      flowType: "pkce",
+      flowType: "implicit",
       autoRefreshToken: true,
       persistSession: true,
+      detectSessionInUrl: true,
     },
   });
 }
 
 async function init() {
+  // Read recovery state BEFORE createClient: implicit flow + detectSessionInUrl
+  // parses the hash and calls history.replaceState to clean it during init.
+  const recoveryType = parseRecoveryFragment();
+
   const sb = await createSupabaseClient();
   bindLoginButtons(sb);
   bindRecoverButtons(sb);
@@ -109,25 +114,14 @@ async function init() {
     return handleAuthorize(sb, session);
   }
 
-  // Recovery flow: GoTrue's /auth/v1/verify redirects here with the
-  // session in the URL fragment and `type=recovery`. supabase-js parses
-  // the fragment automatically when persistSession is on; we just need to
-  // detect the recovery type and show the reset form.
-  const recoveryType = parseRecoveryFragment();
   if (recoveryType === "expired") {
     history.replaceState(null, "", window.location.pathname);
     showLoginView();
     showError('Recovery link has expired — click "Forgot your password?" to request a new one.');
     return;
   }
-  if (recoveryType === "recovery") {
-    // Wait briefly for supabase-js to parse the fragment into a session.
-    const recoverySession = await waitForRecoverySession(sb);
-    if (recoverySession) {
-      // Strip fragment so a refresh doesn't re-trigger the flow.
-      history.replaceState(null, "", window.location.pathname);
-      return showResetView();
-    }
+  if (recoveryType === "recovery" && session) {
+    return showResetView();
   }
 
   // OAuth callback (social provider) hash/params
@@ -158,15 +152,6 @@ function parseRecoveryFragment() {
   if (hash.includes("error_code=otp_expired")) return "expired";
   if (!hash.includes("type=recovery")) return null;
   return "recovery";
-}
-
-async function waitForRecoverySession(sb, attempts = 10) {
-  for (let i = 0; i < attempts; i++) {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) return session;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  return null;
 }
 
 let isSignUp = false;
@@ -292,39 +277,58 @@ function bindResetButtons(sb) {
 }
 
 async function handleAuthorize(sb, session) {
-  const params = parseAuthorizeParams();
-  if (!params) {
-    // No OAuth params — show login or signed-in state
+  const authorizationId = parseAuthorizationId();
+  if (!authorizationId) {
     if (session) return showSignedIn(sb, session);
     return showLoginView();
   }
 
   if (!session) {
-    // Store OAuth params, show login. After login, redirect back to /authorize with same params.
-    sessionStorage.setItem("oauth_authorize_params", window.location.search);
+    sessionStorage.setItem("pending_authorization_id", authorizationId);
     showLoginView();
     return;
   }
 
-  // User is authenticated — GoTrue handles consent automatically.
-  // Redirect back to GoTrue's authorize endpoint with the session.
-  // GoTrue will check the session cookie and proceed with the code grant.
   showView("authorize");
-  document.getElementById("authorize-app").textContent = params.clientId;
 
-  // Re-trigger the authorize flow — GoTrue should now see the session
-  // and redirect back to the client with an auth code.
-  const authorizeUrl = new URL(
-    `${SUPABASE_URL}/auth/v1/oauth/authorize${window.location.search}`
+  const response = await fetch(
+    `${SUPABASE_URL}/auth/v1/oauth/authorizations/${authorizationId}/consent`,
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${session.access_token}`,
+        "apikey": SUPABASE_ANON_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ action: "approve" }),
+    },
   );
-  window.location.href = authorizeUrl.toString();
+
+  if (!response.ok) {
+    const text = await response.text();
+    console.error("consent failed", response.status, text);
+    showLoginView();
+    showError(`Authorization failed: ${response.status} ${text}`);
+    return;
+  }
+
+  const data = await response.json();
+  const redirectTo = data.redirect_to || data.redirect_url || data.redirect_uri;
+  if (!redirectTo) {
+    console.error("consent response missing redirect", data);
+    showLoginView();
+    showError("Authorization succeeded but server returned no redirect URL");
+    return;
+  }
+  window.location.href = redirectTo;
 }
 
 async function handlePostLogin(sb, session) {
-  const savedParams = sessionStorage.getItem("oauth_authorize_params");
-  if (savedParams) {
-    sessionStorage.removeItem("oauth_authorize_params");
-    window.location.href = `/authorize${savedParams}`;
+  const pendingAuthId = sessionStorage.getItem("pending_authorization_id");
+  if (pendingAuthId) {
+    sessionStorage.removeItem("pending_authorization_id");
+    window.location.href =
+      `/authorize?authorization_id=${encodeURIComponent(pendingAuthId)}`;
     return;
   }
 

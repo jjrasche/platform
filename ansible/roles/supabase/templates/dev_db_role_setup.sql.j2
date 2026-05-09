@@ -1,0 +1,32 @@
+-- Provision a tenant developer/regression DB role.
+-- Idempotent: safe to re-apply on every deploy.
+-- The password comes via psql -v pw='...' (set by the calling Ansible task).
+-- Templated from ansible/roles/supabase/templates/dev_db_role_setup.sql.j2.
+--
+-- This role exists to support direct asyncpg access from the tenant's
+-- regression test runner via an SSH tunnel. It bypasses RLS because
+-- fixture seeding crosses ownership boundaries (creates a campaign,
+-- inserts entities owned by a synthetic auth.users row, etc.).
+-- Production app code MUST NOT use this role — tenant apps use the
+-- platform anon key + user JWTs which respect RLS.
+
+\set ON_ERROR_STOP on
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{{ entry.db_role }}') THEN
+    CREATE ROLE {{ entry.db_role }} LOGIN BYPASSRLS;
+  END IF;
+END $$;
+
+ALTER ROLE {{ entry.db_role }} LOGIN PASSWORD :'pw' BYPASSRLS;
+
+{% for schema in entry.schemas %}
+GRANT USAGE ON SCHEMA {{ schema }} TO {{ entry.db_role }};
+GRANT INSERT, SELECT, DELETE ON ALL TABLES IN SCHEMA {{ schema }} TO {{ entry.db_role }};
+ALTER DEFAULT PRIVILEGES IN SCHEMA {{ schema }}
+  GRANT INSERT, SELECT, DELETE ON TABLES TO {{ entry.db_role }};
+{% endfor %}
+
+GRANT USAGE ON SCHEMA auth TO {{ entry.db_role }};
+GRANT INSERT, SELECT, DELETE ON auth.users TO {{ entry.db_role }};

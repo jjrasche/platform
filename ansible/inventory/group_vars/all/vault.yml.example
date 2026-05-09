@@ -27,3 +27,12 @@ vault_ghcr_token: "CHANGE_ME"
 
 # gitea
 vault_gitea_secret_key: "CHANGE_ME_run_openssl_rand_hex_32"
+vault_gitea_oauth_client_id: "CHANGE_ME_uuid_v4"
+vault_gitea_oauth_client_secret: "CHANGE_ME_run_openssl_rand_hex_32"
+
+# Per-tenant dev DB access (one pair of entries per tenant_dev_db_access entry).
+# Naming convention: vault_<tunnel_user>_ssh_pubkey + vault_<db_role>_db_password.
+# Pubkey can be empty (string "") at first — Ansible skips authorized_keys
+# until a non-empty value is set, lets us land the role + password first.
+vault_dm_tunnel_ssh_pubkey: ""
+vault_dm_seeder_db_password: "CHANGE_ME_openssl_rand_base64_24"

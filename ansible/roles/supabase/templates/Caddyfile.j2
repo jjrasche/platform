@@ -16,6 +16,11 @@ dm.jimr.fyi {
 
     handle {
         root * /var/www/dungeon-master
+        # auth-bootstrap.js and config.js are auth-critical — a stale cached
+        # copy after a flow-type or anon-key change locks users into a
+        # redirect loop. Force revalidation on every load.
+        header /auth-bootstrap.js Cache-Control "no-cache, must-revalidate"
+        header /config.js Cache-Control "no-cache, must-revalidate"
         try_files {path} /index.html
         file_server
     }
@@ -55,6 +60,14 @@ dm.jimr.fyi {
     }
 }
 {{ supabase_api_domain }} {
+    # OIDC discovery doc — GoTrue v2.186 returns relative URLs and an empty
+    # issuer, which breaks any OIDC client (Gitea, Grafana, etc.). Serve a
+    # corrected doc here and let everything else fall through to Kong.
+    handle /auth/v1/.well-known/openid-configuration {
+        header Content-Type application/json
+        respond `{"issuer":"https://{{ supabase_api_domain }}/auth/v1","authorization_endpoint":"https://{{ supabase_api_domain }}/auth/v1/oauth/authorize","token_endpoint":"https://{{ supabase_api_domain }}/auth/v1/oauth/token","jwks_uri":"https://{{ supabase_api_domain }}/auth/v1/.well-known/jwks.json","userinfo_endpoint":"https://{{ supabase_api_domain }}/auth/v1/oauth/userinfo","scopes_supported":["openid","profile","email"],"response_types_supported":["code"],"response_modes_supported":["query"],"grant_types_supported":["authorization_code","refresh_token"],"subject_types_supported":["public"],"id_token_signing_alg_values_supported":["ES256"],"token_endpoint_auth_methods_supported":["client_secret_post","client_secret_basic"],"claims_supported":["sub","aud","iss","exp","iat","email","email_verified","name"],"code_challenge_methods_supported":["S256"]}` 200
+    }
+
     handle /rest/v1/* {
         reverse_proxy kong:8000
     }

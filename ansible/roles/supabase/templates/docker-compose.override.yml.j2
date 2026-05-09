@@ -17,7 +17,7 @@ services:
 
 {% endfor %}
   gitea:
-    image: gitea/gitea:1.22.6
+    image: gitea/gitea:1.25.2
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -135,17 +135,17 @@ services:
       GOTRUE_EXTERNAL_GITHUB_SECRET: ${GOTRUE_EXTERNAL_GITHUB_SECRET:-}
       GOTRUE_EXTERNAL_GITHUB_REDIRECT_URI: ${GOTRUE_EXTERNAL_GITHUB_REDIRECT_URI:-}
 {% if oauth_server_enabled %}
-      # Asymmetric JWT signing — gated on oauth_server_enabled flag.
-      # GoTrue REJECTS empty GOTRUE_JWT_KEYS at boot (fatal: "unexpected end of
-      # JSON input"), so the line must be absent entirely when disabled, not
-      # passed as an empty string.
-      GOTRUE_JWT_KEYS: ${GOTRUE_JWT_KEYS:-}
-      GOTRUE_JWT_VALID_METHODS: ${GOTRUE_JWT_VALID_METHODS:-ES256,HS256}
-      GOTRUE_OAUTH_SERVER_ENABLED: ${GOTRUE_OAUTH_SERVER_ENABLED:-false}
-      GOTRUE_OAUTH_SERVER_AUTHORIZATION_PATH: ${GOTRUE_OAUTH_SERVER_AUTHORIZATION_PATH:-/authorize}
-      GOTRUE_OAUTH_SERVER_AUTHORIZATION_TTL: ${GOTRUE_OAUTH_SERVER_AUTHORIZATION_TTL:-10m}
-      GOTRUE_OAUTH_SERVER_DEFAULT_SCOPE: ${GOTRUE_OAUTH_SERVER_DEFAULT_SCOPE:-openid email}
-      GOTRUE_OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION: ${GOTRUE_OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION:-false}
+      GOTRUE_OAUTH_SERVER_ENABLED: ${GOTRUE_OAUTH_SERVER_ENABLED}
+      GOTRUE_OAUTH_SERVER_AUTHORIZATION_PATH: ${GOTRUE_OAUTH_SERVER_AUTHORIZATION_PATH}
+      GOTRUE_OAUTH_SERVER_AUTHORIZATION_TTL: ${GOTRUE_OAUTH_SERVER_AUTHORIZATION_TTL}
+      GOTRUE_OAUTH_SERVER_DEFAULT_SCOPE: ${GOTRUE_OAUTH_SERVER_DEFAULT_SCOPE}
+      GOTRUE_OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION: ${GOTRUE_OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION}
+{% if vault_gotrue_jwt_keys is defined %}
+      # ES256 signing — only when asymmetric keys are provisioned. GoTrue rejects
+      # empty GOTRUE_JWT_KEYS at boot, so this block must be absent when unset.
+      GOTRUE_JWT_KEYS: ${GOTRUE_JWT_KEYS}
+      GOTRUE_JWT_VALID_METHODS: ${GOTRUE_JWT_VALID_METHODS}
+{% endif %}
 {% endif %}
 
   rest:
@@ -156,6 +156,12 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+{% if oauth_server_enabled and vault_jwt_jwks is defined %}
+    environment:
+      # Validate ES256 (current) + HS256 (legacy + agent tokens) via JWKS.
+      PGRST_JWT_SECRET: ${JWT_JWKS}
+      PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_JWKS}
+{% endif %}
 
   realtime:
     cap_drop:
@@ -166,6 +172,10 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    # NOTE: realtime stays on HS256-only (Joken library doesn't parse JWKS).
+    # ES256 user tokens won't authenticate to realtime channels until upstream
+    # supabase-realtime adds JWKS support. dm.jimr.fyi doesn't use realtime,
+    # so this is non-blocking for the OIDC cutover.
 
   storage:
     security_opt:
@@ -175,6 +185,10 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+{% if oauth_server_enabled and vault_jwt_jwks is defined %}
+    environment:
+      PGRST_JWT_SECRET: ${JWT_JWKS}
+{% endif %}
 
   imgproxy:
     security_opt:
@@ -206,6 +220,14 @@ services:
       # Tenant Edge Function secrets — scoped here so they don't leak to
       # other Supabase services. Source values come from .env (mode 0600).
       GROQ_API_KEY: ${GROQ_API_KEY}
+{% if oauth_server_enabled and vault_jwt_jwks is defined %}
+      # Runtime validates incoming JWTs (ES256 + HS256) against the JWKS.
+      JWT_SECRET: ${JWT_JWKS}
+      # Functions that still sign HS256 tokens (e.g. mint-agent-token) read
+      # the legacy shared secret from this var. JWT_SECRET is no longer a
+      # plain string after the OIDC cutover.
+      LEGACY_HS256_SECRET: ${JWT_SECRET}
+{% endif %}
 
   analytics:
     security_opt:

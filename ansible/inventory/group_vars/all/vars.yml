@@ -11,8 +11,38 @@ backup_bucket: jmr-backups
 app_distribution_domain: apps.jimr.fyi
 monitoring_domain: status.jimr.fyi
 auth_domain: auth.jimr.fyi
+gitea_domain: git.jimr.fyi
 apk_retention_count: 5
+
+# OAuth 2.1 Server / asymmetric (ES256) JWT signing.
+# When true, GoTrue signs user JWTs with ES256 and exposes /oauth/authorize.
+# When false, GoTrue mints HS256 user JWTs validated by PostgREST + edge-runtime
+# using the shared JWT_SECRET — the simple, working V1.2 configuration.
+#
+# Re-enabling this requires PostgREST and edge-runtime to validate ES256 via
+# the JWKS endpoint. Until that downstream wiring lands (V1.3 punch list),
+# leave this false — otherwise user JWTs validate at sign-in but fail at
+# every PostgREST RPC and Edge Function call. See implementer's
+# reference_es256_user_jwt_blocker.md for the failure modes.
+oauth_server_enabled: false
 ci_deploy_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPMpe8/hgmlj+2Nlvymf8iWxBnNzaIBUyPkDtJvz2+R6 ci-deploy@platform"
+
+# Edge Functions sourced from sibling tenant repos. The playbook reads
+# from ../<repo>/supabase/functions/<function>/ — CI must check out
+# siblings before applying. Each entry deploys to {supabase_dir}/docker/
+# volumes/functions/<function>/ on VPS1.
+#
+# Add tenants here only AFTER their Edge Function code is reviewed AND
+# their migrations are applied — otherwise a broken handler lands and
+# crashes on first request.
+tenant_edge_functions:
+  - { repo: dungeon-master, function: turn }
+
+# Tenant repos whose supabase/migrations/*.sql land on the shared Postgres
+# via the Ansible role. Replaces the tenant-side deploy.yml psql apply path.
+# Migrations must be idempotent — they re-run on every playbook apply.
+tenant_db_repos:
+  - dungeon-master
 
 # Luanti game server
 luanti_dir: /opt/luanti

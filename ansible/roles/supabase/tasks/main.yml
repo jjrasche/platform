@@ -40,10 +40,20 @@
     state: directory
     mode: "0755"
 
-- name: Deploy auth portal files
+- name: Compute portal asset version (cache-bust stamp)
+  set_fact:
+    portal_asset_version: "{{ ansible_date_time.epoch }}"
+
+- name: Deploy auth portal files (non-templated assets)
   copy:
     src: "{{ playbook_dir }}/../portal/"
     dest: /opt/auth-portal/
+    mode: "0644"
+
+- name: Template auth portal index.html with cache-busted asset versions
+  template:
+    src: "{{ playbook_dir }}/../portal/index.html"
+    dest: /opt/auth-portal/index.html
     mode: "0644"
 
 - name: Template auth portal config with anon key
@@ -52,12 +62,32 @@
     dest: /opt/auth-portal/config.js
     mode: "0644"
 
+# dungeon-master config.js — platform owns env-specific values (URL + anon
+# key); the dungeon-master CI deploy preserves this file across rebuilds.
+# Co-located with the wasm bundle in /var/www/dungeon-master/ so Caddy's
+# file_server picks it up at https://dm.jimr.fyi/config.js.
+- name: Ensure dungeon-master static dir exists
+  file:
+    path: /var/www/dungeon-master
+    state: directory
+    mode: "0755"
+    owner: deploy
+    group: deploy
+
+- name: Template dungeon-master config.js
+  template:
+    src: dm-config.js.j2
+    dest: /var/www/dungeon-master/config.js
+    mode: "0644"
+    owner: deploy
+    group: deploy
+
 - name: Check if JWKS route exists in Kong config
   command: grep -q 'auth-v1-open-jwks' "{{ supabase_dir }}/docker/volumes/api/kong.yml"
   register: jwks_route_check
   failed_when: false
   changed_when: false
-  when: vault_gotrue_jwt_keys is defined
+  when: oauth_server_enabled and vault_gotrue_jwt_keys is defined
 
 - name: Add JWKS route to Kong config
   shell: |
@@ -72,7 +102,7 @@
         plugins:
           - name: cors
     EOF
-  when: vault_gotrue_jwt_keys is defined and jwks_route_check.rc != 0
+  when: oauth_server_enabled and vault_gotrue_jwt_keys is defined and jwks_route_check.rc != 0
 
 - name: Login to GHCR
   community.docker.docker_login:
@@ -89,7 +119,7 @@
 
 # New domains require a full restart — Caddy reload doesn't pick them up
 - name: Restart Caddy for new domains
-  shell: docker restart $(docker ps --format '{{.Names}}' | grep caddy)
+  shell: docker restart $(docker ps --format '{% raw %}{{.Names}}{% endraw %}' | grep caddy)
   when: caddyfile_result is changed
   register: caddy_restarted
 
@@ -150,16 +180,106 @@
   register: storage_migration
   changed_when: "'INSERT' in storage_migration.stdout"
 
-- name: Deploy mint-agent-token Edge Function
+- name: Copy auth-trigger email-safe migration to remote
   copy:
-    src: functions/mint-agent-token/
-    dest: "{{ supabase_dir }}/docker/volumes/functions/mint-agent-token/"
+    src: migrations/005_handle_new_auth_user_email_safe.sql
+    dest: /tmp/005_handle_new_auth_user_email_safe.sql
     mode: "0644"
-  register: edge_function_deployed
 
-- name: Restart Edge Functions container for new function
+- name: Run auth-trigger email-safe migration
+  shell: |
+    docker exec -i supabase-db psql -U supabase_admin -d postgres \
+      < /tmp/005_handle_new_auth_user_email_safe.sql
+  register: auth_trigger_migration
+  changed_when: "'CREATE FUNCTION' in auth_trigger_migration.stdout"
+
+- name: Copy skip-mirror-for-email-only migration to remote
+  copy:
+    src: migrations/006_skip_mirror_for_email_only.sql
+    dest: /tmp/006_skip_mirror_for_email_only.sql
+    mode: "0644"
+
+- name: Run skip-mirror-for-email-only migration
+  shell: |
+    docker exec -i supabase-db psql -U supabase_admin -d postgres \
+      -v ON_ERROR_STOP=1 \
+      < /tmp/006_skip_mirror_for_email_only.sql
+  register: skip_mirror_migration
+  changed_when: "'CREATE FUNCTION' in skip_mirror_migration.stdout"
+
+# Tenant DB migrations — read each repo's supabase/migrations/*.sql in
+# numeric order, copy to /tmp on VPS1, apply with ON_ERROR_STOP=1.
+# Migrations must be idempotent (CREATE TABLE IF NOT EXISTS, etc.) since
+# this loop runs every apply. Replaces tenant-side deploy.yml apply paths.
+- name: Discover tenant migration files
+  delegate_to: localhost
+  become: false
+  find:
+    paths: "{{ playbook_dir }}/../../{{ item }}/supabase/migrations"
+    patterns: "*.sql"
+  loop: "{{ tenant_db_repos | default([]) }}"
+  loop_control:
+    label: "{{ item }}"
+  register: tenant_migration_discovery
+
+- name: Flatten tenant migrations into ordered list
+  set_fact:
+    tenant_migrations: "{{ (tenant_migrations | default([])) + (item.files | sort(attribute='path') | map('combine', {'repo': item.item}) | list) }}"
+  loop: "{{ tenant_migration_discovery.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }} ({{ item.files | default([]) | length }} files)"
+  when: item.files is defined
+
+- name: Copy tenant migrations to VPS1
+  copy:
+    src: "{{ item.path }}"
+    dest: "/tmp/tenant_{{ item.repo }}_{{ item.path | basename }}"
+    mode: "0644"
+  loop: "{{ tenant_migrations | default([]) }}"
+  loop_control:
+    label: "{{ item.repo }}/{{ item.path | basename }}"
+
+- name: Apply tenant migrations
+  shell: |
+    docker exec -i supabase-db psql -U supabase_admin -d postgres \
+      -v ON_ERROR_STOP=1 \
+      < /tmp/tenant_{{ item.repo }}_{{ item.path | basename }}
+  loop: "{{ tenant_migrations | default([]) }}"
+  loop_control:
+    label: "{{ item.repo }}/{{ item.path | basename }}"
+  register: tenant_migration_apply
+  changed_when: tenant_migration_apply.stdout is search('CREATE|ALTER|INSERT|GRANT|UPDATE')
+
+# In-repo Edge Functions (platform-owned, source under ansible/roles/supabase/files/functions/)
+- name: Deploy in-repo Edge Functions
+  copy:
+    src: "functions/{{ item }}/"
+    dest: "{{ supabase_dir }}/docker/volumes/functions/{{ item }}/"
+    mode: "0644"
+  loop:
+    - mint-agent-token
+    - timeout-probe
+  register: in_repo_functions_deployed
+
+# Tenant-owned Edge Functions (source under sibling repo's supabase/functions/{name}/)
+# Repos must be checked out at ../<repo>/ relative to the platform repo's root for this
+# to resolve. CI checks out siblings before invoking this playbook.
+- name: Deploy tenant-owned Edge Functions
+  copy:
+    src: "{{ playbook_dir }}/../../{{ item.repo }}/supabase/functions/{{ item.function }}/"
+    dest: "{{ supabase_dir }}/docker/volumes/functions/{{ item.function }}/"
+    mode: "0644"
+  loop: "{{ tenant_edge_functions | default([]) }}"
+  loop_control:
+    label: "{{ item.repo }}/{{ item.function }}"
+  register: tenant_functions_deployed
+  # Skip silently if the sibling repo isn't checked out — local apply paths
+  # often only have the platform repo, not every tenant.
+  failed_when: false
+
+- name: Restart Edge Functions container if any function changed
   shell: docker restart $(docker ps --format '{% raw %}{{.Names}}{% endraw %}' | grep functions)
-  when: edge_function_deployed is changed
+  when: in_repo_functions_deployed is changed or tenant_functions_deployed is changed
 
 - name: Wait for auth service to be ready
   uri:
@@ -171,7 +291,6 @@
   retries: 12
   delay: 5
   until: auth_ready.status == 200
-  when: vault_gotrue_jwt_keys is defined
 
 - name: Register tenant apps as OAuth clients
   uri:
@@ -189,7 +308,32 @@
       token_endpoint_auth_method: "none"
     status_code: [200, 201, 403, 409, 422]
   loop: "{{ tenants }}"
-  when: vault_gotrue_jwt_keys is defined
+  when: oauth_server_enabled and vault_gotrue_jwt_keys is defined
   register: oauth_clients
   changed_when: oauth_clients.status in [200, 201]
-  # 403 = SERVICE_ROLE_KEY needs re-signing with ES256 (see handoff)
+
+# End-of-deploy verification — actually exercise the user-facing surfaces
+# we just changed. Failing here means deploy didn't reach the user, even if
+# every prior task said `ok`. Add new gates here whenever we ship a feature
+# that has a load-bearing assertion (a specific element in markup, a working
+# endpoint, etc).
+- name: Verify auth portal serves recovery UI (post-deploy gate)
+  uri:
+    url: "https://{{ auth_domain }}/?cb={{ portal_asset_version }}"
+    return_content: true
+  register: portal_check
+  failed_when: "'forgot-link' not in portal_check.content or portal_asset_version not in portal_check.content"
+
+- name: Verify api.jimr.fyi/auth/v1/health responds 200
+  uri:
+    url: "https://{{ supabase_api_domain }}/auth/v1/health"
+    headers:
+      apikey: "{{ vault_anon_key }}"
+    status_code: 200
+
+- name: Verify auth.jimr.fyi/auth/v1/health responds 200 (recovery email links resolve here)
+  uri:
+    url: "https://{{ auth_domain }}/auth/v1/health"
+    headers:
+      apikey: "{{ vault_anon_key }}"
+    status_code: 200

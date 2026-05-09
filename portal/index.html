@@ -23,8 +23,32 @@
           <button type="submit" id="btn-submit" class="btn btn-primary">Sign In</button>
         </form>
         <p class="toggle-link"><a href="#" id="toggle-mode">Don't have an account? Sign up</a></p>
+        <p class="toggle-link"><a href="#" id="forgot-link">Forgot your password?</a></p>
         <p id="login-error" class="error hidden"></p>
         <p id="login-success" class="success hidden"></p>
+      </div>
+
+      <div id="view-recover" class="view hidden">
+        <p class="subtitle">Reset your password</p>
+        <p class="hint">Enter your email. We'll send you a link to set a new password.</p>
+        <form id="form-recover" autocomplete="on">
+          <input id="recover-email" type="email" placeholder="Email" autocomplete="email" required>
+          <button type="submit" class="btn btn-primary">Send recovery link</button>
+        </form>
+        <p class="toggle-link"><a href="#" id="back-to-login">Back to sign in</a></p>
+        <p id="recover-error" class="error hidden"></p>
+        <p id="recover-success" class="success hidden"></p>
+      </div>
+
+      <div id="view-reset" class="view hidden">
+        <p class="subtitle">Set a new password</p>
+        <form id="form-reset" autocomplete="on">
+          <input id="reset-password" type="password" placeholder="New password (min 6)" autocomplete="new-password" minlength="6" required>
+          <input id="reset-password-confirm" type="password" placeholder="Confirm new password" autocomplete="new-password" minlength="6" required>
+          <button type="submit" class="btn btn-primary">Update password</button>
+        </form>
+        <p id="reset-error" class="error hidden"></p>
+        <p id="reset-success" class="success hidden"></p>
       </div>
 
       <div id="view-authorize" class="view hidden">
@@ -45,7 +69,12 @@
       </div>
     </div>
   </main>
-  <script src="/config.js"></script>
-  <script src="/app.js"></script>
+  <!-- v= is auto-stamped at deploy time by Ansible (ansible_date_time.epoch).
+       Every deploy gets a unique URL, bypassing Cloudflare's 4hr edge cache
+       and any browser cache. The portal_asset_version expression below is
+       substituted by the template task in the supabase Ansible role; leave
+       it intact. -->
+  <script src="/config.js?v={{ portal_asset_version }}"></script>
+  <script src="/app.js?v={{ portal_asset_version }}"></script>
 </body>
 </html>

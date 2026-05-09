@@ -156,6 +156,17 @@ resource "cloudflare_zone_settings_override" "jimr_fyi" {
   }
 }
 
+# --- Gitea git hosting ---
+
+resource "cloudflare_record" "git" {
+  zone_id = var.cloudflare_zone_id
+  name    = "git"
+  content = hcloud_server.platform.ipv4_address
+  type    = "A"
+  proxied = true
+  ttl     = 1
+}
+
 # --- Luanti game server DNS (UDP — cannot be proxied) ---
 
 resource "cloudflare_record" "play" {

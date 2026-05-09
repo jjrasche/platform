@@ -1,0 +1,99 @@
+name: Deploy tenant Edge Function
+
+# Listener for the dungeon-master `edge-functions-deploy.yml` workflow (and
+# any other tenant that adopts the pattern). Tenant CI fires:
+#   gh workflow run deploy-edge-functions.yml --repo jjrasche/platform \
+#     -f tenant_repo=<repo> -f function=<name>
+#
+# This workflow checks out the tenant at its current main HEAD, validates
+# the function source exists, rsyncs it to /opt/supabase/docker/volumes/
+# functions/<name>/ on VPS1, and bounces supabase-edge-functions.
+#
+# Trust model: only repos under jjrasche/* are accepted (see strict input
+# whitelist in the validate step). The fine-grained PAT used by tenant CI
+# only grants `actions:write` on this repo, so a compromised tenant token
+# cannot read VPS_SSH_KEY or arbitrary platform secrets.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tenant_repo:
+        required: true
+        type: string
+        description: "Tenant repo (without owner). Must be in the allowed set."
+      function:
+        required: true
+        type: string
+        description: "Function name under supabase/functions/<name>/"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate inputs
+        env:
+          ALLOWED_REPOS: "dungeon-master house-ops practice-exchange event-planner minecraft-companion"
+        run: |
+          set -euo pipefail
+          if ! echo " $ALLOWED_REPOS " | grep -q " ${{ inputs.tenant_repo }} "; then
+            echo "::error::tenant_repo '${{ inputs.tenant_repo }}' not in allowed set: $ALLOWED_REPOS"
+            exit 1
+          fi
+          if ! echo "${{ inputs.function }}" | grep -qE '^[a-z][a-z0-9_-]{0,40}$'; then
+            echo "::error::function name must match ^[a-z][a-z0-9_-]{0,40}$"
+            exit 1
+          fi
+
+      - name: Checkout tenant repo
+        uses: actions/checkout@v4
+        with:
+          repository: jjrasche/${{ inputs.tenant_repo }}
+          ref: main
+          path: tenant
+
+      - name: Confirm function source exists
+        run: |
+          set -euo pipefail
+          SRC="tenant/supabase/functions/${{ inputs.function }}"
+          if [ ! -d "$SRC" ]; then
+            echo "::error::no source at $SRC"
+            exit 1
+          fi
+          if [ ! -f "$SRC/index.ts" ]; then
+            echo "::error::no index.ts in $SRC"
+            exit 1
+          fi
+          ls -la "$SRC"
+
+      - name: Stage on VPS1
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: deploy
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "tenant/supabase/functions/${{ inputs.function }}/*"
+          target: "/tmp/edge-deploy-${{ github.run_id }}/"
+          strip_components: 3
+
+      - name: Install + restart edge-runtime
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: deploy
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            DEST=/opt/supabase/docker/volumes/functions/${{ inputs.function }}
+            STAGE=/tmp/edge-deploy-${{ github.run_id }}
+            sudo install -d -m 755 -o root -g root "$DEST"
+            sudo rsync -a --delete "$STAGE/" "$DEST/"
+            sudo find "$DEST" -type f -exec chmod 0644 {} \;
+            sudo find "$DEST" -type d -exec chmod 0755 {} \;
+            rm -rf "$STAGE"
+            sudo docker restart supabase-edge-functions
+            sleep 4
+            sudo docker logs supabase-edge-functions --tail 12
+            echo "Deployed ${{ inputs.tenant_repo }}/${{ inputs.function }} at $(date -u +%Y-%m-%dT%H:%M:%SZ)"

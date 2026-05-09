@@ -25,9 +25,9 @@
   become: true
 
   roles:
-    - common
-    - monitoring
-    - supabase
-    - app-distribution
-    - luanti
+    - { role: common, tags: [common] }
+    - { role: monitoring, tags: [monitoring] }
+    - { role: supabase, tags: [supabase] }
+    - { role: app-distribution, tags: [app-distribution] }
+    - { role: luanti, tags: [luanti] }
 

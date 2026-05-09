@@ -13,6 +13,8 @@ const SUPABASE_ANON_KEY = window.__SUPABASE_ANON_KEY__ || "";
 const views = {
   loading: document.getElementById("view-loading"),
   login: document.getElementById("view-login"),
+  recover: document.getElementById("view-recover"),
+  reset: document.getElementById("view-reset"),
   authorize: document.getElementById("view-authorize"),
   denied: document.getElementById("view-denied"),
   signedIn: document.getElementById("view-signed-in"),
@@ -27,6 +29,31 @@ function showError(message) {
   const el = document.getElementById("login-error");
   el.textContent = message;
   el.classList.remove("hidden");
+}
+
+function redirectWithSession(returnTo, session) {
+  const url = new URL(returnTo);
+  url.hash = [
+    `access_token=${encodeURIComponent(session.access_token)}`,
+    `refresh_token=${encodeURIComponent(session.refresh_token)}`,
+    `expires_in=${session.expires_in ?? 3600}`,
+    `token_type=bearer`,
+  ].join("&");
+  window.location.href = url.toString();
+}
+
+function readReturnTo() {
+  const url = new URLSearchParams(window.location.search).get("return_to")
+    || sessionStorage.getItem("pending_return_to");
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return null;
+    if (!parsed.hostname.endsWith(".jimr.fyi") && parsed.hostname !== "practice.exchange") return null;
+    return url;
+  } catch {
+    return null;
+  }
 }
 
 function parseAuthorizeParams() {
@@ -67,6 +94,12 @@ async function createSupabaseClient() {
 async function init() {
   const sb = await createSupabaseClient();
   bindLoginButtons(sb);
+  bindRecoverButtons(sb);
+  bindResetButtons(sb);
+
+  // Preserve return_to across recovery email redirect (which wipes query params)
+  const rawReturnTo = new URLSearchParams(window.location.search).get("return_to");
+  if (rawReturnTo) sessionStorage.setItem("pending_return_to", rawReturnTo);
 
   const {
     data: { session },
@@ -76,7 +109,28 @@ async function init() {
     return handleAuthorize(sb, session);
   }
 
-  // Handle OAuth callback hash/params from social provider login
+  // Recovery flow: GoTrue's /auth/v1/verify redirects here with the
+  // session in the URL fragment and `type=recovery`. supabase-js parses
+  // the fragment automatically when persistSession is on; we just need to
+  // detect the recovery type and show the reset form.
+  const recoveryType = parseRecoveryFragment();
+  if (recoveryType === "expired") {
+    history.replaceState(null, "", window.location.pathname);
+    showLoginView();
+    showError('Recovery link has expired — click "Forgot your password?" to request a new one.');
+    return;
+  }
+  if (recoveryType === "recovery") {
+    // Wait briefly for supabase-js to parse the fragment into a session.
+    const recoverySession = await waitForRecoverySession(sb);
+    if (recoverySession) {
+      // Strip fragment so a refresh doesn't re-trigger the flow.
+      history.replaceState(null, "", window.location.pathname);
+      return showResetView();
+    }
+  }
+
+  // OAuth callback (social provider) hash/params
   if (window.location.hash || window.location.search.includes("code=")) {
     const { data, error } = await sb.auth.exchangeCodeForSession(
       window.location.search
@@ -87,10 +141,32 @@ async function init() {
   }
 
   if (session) {
+    const returnTo = readReturnTo();
+    if (returnTo) {
+      sessionStorage.removeItem("pending_return_to");
+      redirectWithSession(returnTo, session);
+      return;
+    }
     return showSignedIn(sb, session);
   }
 
   showLoginView();
+}
+
+function parseRecoveryFragment() {
+  const hash = window.location.hash || "";
+  if (hash.includes("error_code=otp_expired")) return "expired";
+  if (!hash.includes("type=recovery")) return null;
+  return "recovery";
+}
+
+async function waitForRecoverySession(sb, attempts = 10) {
+  for (let i = 0; i < attempts; i++) {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) return session;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return null;
 }
 
 let isSignUp = false;
@@ -153,6 +229,68 @@ function showLoginView() {
   showView("login");
 }
 
+function showResetView() {
+  showView("reset");
+}
+
+function bindRecoverButtons(sb) {
+  document.getElementById("forgot-link").addEventListener("click", (e) => {
+    e.preventDefault();
+    showView("recover");
+  });
+  document.getElementById("back-to-login").addEventListener("click", (e) => {
+    e.preventDefault();
+    showView("login");
+  });
+  document.getElementById("form-recover").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("recover-email").value;
+    const errEl = document.getElementById("recover-error");
+    const okEl = document.getElementById("recover-success");
+    errEl.classList.add("hidden");
+    okEl.classList.add("hidden");
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) {
+      errEl.textContent = error.message;
+      errEl.classList.remove("hidden");
+      return;
+    }
+    okEl.textContent = "Check your email for a link to reset your password.";
+    okEl.classList.remove("hidden");
+  });
+}
+
+function bindResetButtons(sb) {
+  document.getElementById("form-reset").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const pw = document.getElementById("reset-password").value;
+    const pw2 = document.getElementById("reset-password-confirm").value;
+    const errEl = document.getElementById("reset-error");
+    const okEl = document.getElementById("reset-success");
+    errEl.classList.add("hidden");
+    okEl.classList.add("hidden");
+    if (pw !== pw2) {
+      errEl.textContent = "Passwords don't match.";
+      errEl.classList.remove("hidden");
+      return;
+    }
+    const { error } = await sb.auth.updateUser({ password: pw });
+    if (error) {
+      errEl.textContent = error.message;
+      errEl.classList.remove("hidden");
+      return;
+    }
+    okEl.textContent = "Password updated. You're signed in.";
+    okEl.classList.remove("hidden");
+    setTimeout(async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) handlePostLogin(sb, session); else showLoginView();
+    }, 1500);
+  });
+}
+
 async function handleAuthorize(sb, session) {
   const params = parseAuthorizeParams();
   if (!params) {
@@ -183,11 +321,17 @@ async function handleAuthorize(sb, session) {
 }
 
 async function handlePostLogin(sb, session) {
-  // Check if we need to complete an OAuth authorize flow
   const savedParams = sessionStorage.getItem("oauth_authorize_params");
   if (savedParams) {
     sessionStorage.removeItem("oauth_authorize_params");
     window.location.href = `/authorize${savedParams}`;
+    return;
+  }
+
+  const returnTo = readReturnTo();
+  if (returnTo) {
+    sessionStorage.removeItem("pending_return_to");
+    redirectWithSession(returnTo, session);
     return;
   }
 

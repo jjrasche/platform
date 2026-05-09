@@ -16,6 +16,33 @@ services:
       - frontend
 
 {% endfor %}
+  gitea:
+    image: gitea/gitea:1.22.6
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+    environment:
+      GITEA__server__DOMAIN: "{{ gitea_domain }}"
+      GITEA__server__ROOT_URL: "https://{{ gitea_domain }}"
+      GITEA__server__HTTP_PORT: "3000"
+      GITEA__server__DISABLE_SSH: "true"
+      GITEA__database__DB_TYPE: "sqlite3"
+      GITEA__database__PATH: "/data/gitea/gitea.db"
+      GITEA__security__INSTALL_LOCK: "true"
+      GITEA__security__SECRET_KEY: "{{ vault_gitea_secret_key }}"
+      GITEA__service__DISABLE_REGISTRATION: "true"
+    volumes:
+      - gitea_data:/data
+    networks:
+      - frontend
+
   gatus:
     image: twinproduction/gatus:latest
     restart: unless-stopped
@@ -59,6 +86,7 @@ services:
     depends_on:
       - kong
       - gatus
+      - gitea
 {% for tenant in tenants if tenant.name != 'dungeon-master' %}
       - frontend-{{ tenant.name }}
 {% endfor %}
@@ -106,15 +134,19 @@ services:
       GOTRUE_EXTERNAL_GITHUB_CLIENT_ID: ${GOTRUE_EXTERNAL_GITHUB_CLIENT_ID:-}
       GOTRUE_EXTERNAL_GITHUB_SECRET: ${GOTRUE_EXTERNAL_GITHUB_SECRET:-}
       GOTRUE_EXTERNAL_GITHUB_REDIRECT_URI: ${GOTRUE_EXTERNAL_GITHUB_REDIRECT_URI:-}
-      # Asymmetric JWT signing
+{% if oauth_server_enabled %}
+      # Asymmetric JWT signing — gated on oauth_server_enabled flag.
+      # GoTrue REJECTS empty GOTRUE_JWT_KEYS at boot (fatal: "unexpected end of
+      # JSON input"), so the line must be absent entirely when disabled, not
+      # passed as an empty string.
       GOTRUE_JWT_KEYS: ${GOTRUE_JWT_KEYS:-}
-      GOTRUE_JWT_VALID_METHODS: ${GOTRUE_JWT_VALID_METHODS:-HS256}
-      # OAuth 2.1 Server
+      GOTRUE_JWT_VALID_METHODS: ${GOTRUE_JWT_VALID_METHODS:-ES256,HS256}
       GOTRUE_OAUTH_SERVER_ENABLED: ${GOTRUE_OAUTH_SERVER_ENABLED:-false}
-      GOTRUE_OAUTH_SERVER_AUTHORIZATION_PATH: ${GOTRUE_OAUTH_SERVER_AUTHORIZATION_PATH:-}
+      GOTRUE_OAUTH_SERVER_AUTHORIZATION_PATH: ${GOTRUE_OAUTH_SERVER_AUTHORIZATION_PATH:-/authorize}
       GOTRUE_OAUTH_SERVER_AUTHORIZATION_TTL: ${GOTRUE_OAUTH_SERVER_AUTHORIZATION_TTL:-10m}
       GOTRUE_OAUTH_SERVER_DEFAULT_SCOPE: ${GOTRUE_OAUTH_SERVER_DEFAULT_SCOPE:-openid email}
       GOTRUE_OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION: ${GOTRUE_OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION:-false}
+{% endif %}
 
   rest:
     security_opt:
@@ -170,6 +202,10 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    environment:
+      # Tenant Edge Function secrets — scoped here so they don't leak to
+      # other Supabase services. Source values come from .env (mode 0600).
+      GROQ_API_KEY: ${GROQ_API_KEY}
 
   analytics:
     security_opt:
@@ -228,3 +264,4 @@ volumes:
   caddy_data:
   caddy_config:
   gatus_data:
+  gitea_data:

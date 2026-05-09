@@ -14,11 +14,6 @@
 dm.jimr.fyi {
     encode zstd gzip
 
-    handle /api/* {
-        uri strip_prefix /api
-        reverse_proxy dungeon-master-backend:8080
-    }
-
     handle {
         root * /var/www/dungeon-master
         try_files {path} /index.html
@@ -42,10 +37,22 @@ dm.jimr.fyi {
     reverse_proxy gatus:8080
 }
 {{ auth_domain }} {
-    root * /opt/auth-portal
-    header Cache-Control "no-cache, must-revalidate"
-    try_files {path} /index.html
-    file_server
+    # /auth/v1/* hits GoTrue (via Kong) so recovery email links and the
+    # OAuth Server endpoints resolve at the same host as SITE_URL.
+    handle /auth/v1/* {
+        reverse_proxy kong:8000
+    }
+
+    handle {
+        root * /opt/auth-portal
+        # Apply no-cache to ALL portal assets, not just the index.html
+        # try_files response. Caddy's `header` directive at the block level
+        # is overridden by file_server's defaults (max-age=14400) for files
+        # it serves; this ordering forces no-cache to win.
+        header * Cache-Control "no-cache, must-revalidate"
+        try_files {path} /index.html
+        file_server
+    }
 }
 {{ supabase_api_domain }} {
     handle /rest/v1/* {
@@ -67,6 +74,10 @@ dm.jimr.fyi {
     handle /functions/v1/* {
         reverse_proxy kong:8000
     }
+}
+
+{{ gitea_domain }} {
+    reverse_proxy gitea:3000
 }
 
 {{ supabase_studio_domain }} {

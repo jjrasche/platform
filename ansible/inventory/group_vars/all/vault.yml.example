@@ -24,3 +24,6 @@ vault_hcloud_token: "CHANGE_ME"
 # dungeon-master deploy
 vault_dm_db_password: "CHANGE_ME"
 vault_ghcr_token: "CHANGE_ME"
+
+# gitea
+vault_gitea_secret_key: "CHANGE_ME_run_openssl_rand_hex_32"

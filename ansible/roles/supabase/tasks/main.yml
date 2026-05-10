@@ -374,6 +374,7 @@
   loop:
     - main
     - mint-agent-token
+    - mint-realtime-token
     - timeout-probe
   register: in_repo_functions_deployed
 

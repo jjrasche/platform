@@ -172,10 +172,12 @@ services:
     read_only: true
     tmpfs:
       - /tmp
-    # NOTE: realtime stays on HS256-only (Joken library doesn't parse JWKS).
-    # ES256 user tokens won't authenticate to realtime channels until upstream
-    # supabase-realtime adds JWKS support. dm.jimr.fyi doesn't use realtime,
-    # so this is non-blocking for the OIDC cutover.
+    # Realtime stays on HS256-only (Joken library doesn't parse JWKS) until
+    # upstream supabase-realtime adds JWKS support. Browser clients work
+    # around this by calling the mint-realtime-token Edge Function to swap
+    # their ES256 user JWT for a short-lived HS256 side-token, then handing
+    # it to sb.realtime.setAuth() before .subscribe(). See
+    # files/functions/mint-realtime-token/index.ts.
 
   storage:
     security_opt:

@@ -57,24 +57,36 @@
 # lifecycle is driven by the supabase role's `Start Supabase stack` task.
 
 - name: Register Pomerium as OAuth client in GoTrue (auth.oauth_clients upsert)
+  # The OIDC `client_id` parameter that Pomerium sends IS the row's uuid `id`
+  # — there is no separate client_id column. redirect_uris and grant_types are
+  # comma-separated text (per gotrue/internal/models/oauth_client.go,
+  # strings.Split(",")). We insert directly because GoTrue's admin API
+  # generates id+secret server-side and only returns the secret on create;
+  # Pomerium needs both pre-known so its config is reproducible.
   shell: |
     docker exec -i supabase-db psql -U supabase_admin -d postgres \
       -v ON_ERROR_STOP=1 <<'SQL'
-    INSERT INTO auth.oauth_clients (id, client_id, client_secret_hash, registration_type, redirect_uris, client_name, token_endpoint_auth_method)
-    VALUES (
+    INSERT INTO auth.oauth_clients (
+      id, client_secret_hash, registration_type, redirect_uris,
+      grant_types, client_name, token_endpoint_auth_method, client_type
+    ) VALUES (
       '{{ vault_pomerium_idp_client_id }}'::uuid,
-      '{{ vault_pomerium_idp_client_id }}',
       crypt('{{ vault_pomerium_idp_client_secret }}', gen_salt('bf')),
       'manual',
-      ARRAY['https://{{ authenticate_domain }}/oauth2/callback'],
+      'https://{{ authenticate_domain }}/oauth2/callback',
+      'authorization_code,refresh_token',
       'Pomerium IAP',
-      'client_secret_post'
+      'client_secret_post',
+      'confidential'
     )
-    ON CONFLICT (client_id) DO UPDATE SET
+    ON CONFLICT (id) DO UPDATE SET
       client_secret_hash = EXCLUDED.client_secret_hash,
       redirect_uris = EXCLUDED.redirect_uris,
+      grant_types = EXCLUDED.grant_types,
       client_name = EXCLUDED.client_name,
-      token_endpoint_auth_method = EXCLUDED.token_endpoint_auth_method;
+      token_endpoint_auth_method = EXCLUDED.token_endpoint_auth_method,
+      client_type = EXCLUDED.client_type,
+      updated_at = now();
     SQL
   register: pomerium_client_upsert
   changed_when: "'INSERT 0 1' in pomerium_client_upsert.stdout or 'UPDATE 1' in pomerium_client_upsert.stdout"

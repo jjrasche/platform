@@ -122,6 +122,7 @@ services:
       - "443:443"
     volumes:
       - ./volumes/pomerium/config.yaml:/pomerium/config.yaml:ro
+      - ./volumes/pomerium/certs:/pomerium/certs:ro
       - pomerium_data:/data
     depends_on:
       - kong

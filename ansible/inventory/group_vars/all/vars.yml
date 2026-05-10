@@ -27,7 +27,7 @@ apk_retention_count: 5
 #   vault_pomerium_idp_client_secret  openssl rand -hex 32
 # Plus terraform/hetzner/main.tf needs the authenticate.jimr.fyi A record
 # applied so Pomerium's HTTP-01 LE challenge resolves.
-pomerium_enabled: false
+pomerium_enabled: true
 
 # OAuth 2.1 Server / asymmetric (ES256) JWT signing.
 # When true, GoTrue signs user JWTs with ES256 and exposes /oauth/authorize.

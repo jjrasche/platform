@@ -19,10 +19,16 @@ idp_scopes:
   - email
   - profile
 
-# HTTP-01 LE issuance. Port 80 must be free; cutover stops Caddy first.
-autocert: true
-autocert_email: jimjrasche@gmail.com
-autocert_dir: /data/autocert
+# Static Cloudflare Origin Certificate for *.jimr.fyi + jimr.fyi.
+# Pomerium's autocert can't traverse Cloudflare's edge proxy (CF strips the
+# acme-tls/1 ALPN extension; Pomerium doesn't fall back to HTTP-01). The
+# Origin Cert is trusted by Cloudflare's edge servers (NOT by browsers — CF
+# terminates TLS to clients with its own edge cert). Cert covers *.jimr.fyi
+# only; practice.exchange runs in a separate CF zone and needs its own cert
+# block (or its route dropped) when that tenant's origin cert is provisioned.
+certificates:
+  - cert_file: /pomerium/certs/origin.crt
+    key_file: /pomerium/certs/origin.key
 
 # Header forwarding defaults — per-route overrides below where needed.
 jwt_claims_headers:

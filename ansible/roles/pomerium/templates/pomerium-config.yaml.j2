@@ -6,12 +6,14 @@ authenticate_service_url: https://{{ authenticate_domain }}
 cookie_secret: {{ vault_pomerium_cookie_secret }}
 shared_secret: {{ vault_pomerium_shared_secret }}
 
-# OIDC against GoTrue. The discovery doc upstream-served by GoTrue v2.186 has
-# wrong issuer + relative URLs; static-jimr serves a corrected JSON at
-# /openid-configuration. idp_provider_url points at the directory whose
-# /.well-known/openid-configuration Pomerium auto-resolves.
+# OIDC against GoTrue. Three values must agree on the issuer string:
+# idp_provider_url, the discovery doc's `issuer`, and GoTrue's minted-token
+# `iss`. GoTrue mints iss=https://api.jimr.fyi/auth/v1, so Pomerium uses the
+# public URL too. Pomerium loopback-fetches the discovery doc through its
+# own route on api.jimr.fyi (which proxies to static-jimr's corrected JSON,
+# fixing GoTrue v2.186's broken empty-issuer discovery).
 idp_provider: oidc
-idp_provider_url: http://static-jimr/oidc
+idp_provider_url: https://{{ supabase_api_domain }}/auth/v1
 idp_client_id: {{ vault_pomerium_idp_client_id }}
 idp_client_secret: {{ vault_pomerium_idp_client_secret }}
 idp_scopes:

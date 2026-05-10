@@ -27,8 +27,8 @@ idp_scopes:
 # only; practice.exchange runs in a separate CF zone and needs its own cert
 # block (or its route dropped) when that tenant's origin cert is provisioned.
 certificates:
-  - cert_file: /pomerium/certs/origin.crt
-    key_file: /pomerium/certs/origin.key
+  - cert: /pomerium/certs/origin.crt
+    key: /pomerium/certs/origin.key
 
 # Header forwarding defaults — per-route overrides below where needed.
 jwt_claims_headers:

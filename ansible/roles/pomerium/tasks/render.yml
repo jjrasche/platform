@@ -1,0 +1,51 @@
+---
+# Pre-deploy: render Pomerium + static-jimr config files. Must run BEFORE
+# `community.docker.docker_compose_v2` brings up the supabase stack —
+# the compose override bind-mounts these specific paths AS FILES, so if
+# they don't exist when compose-up runs, docker auto-creates them as
+# directories and the container init explodes mounting "directory onto
+# a file". Hooked into supabase/tasks/main.yml via include_role.
+
+- name: Create Pomerium config directory on VPS
+  file:
+    path: "{{ supabase_dir }}/docker/volumes/pomerium"
+    state: directory
+    mode: "0755"
+
+- name: Create static sidecar config + content directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ supabase_dir }}/docker/volumes/static-jimr"
+    - "{{ supabase_dir }}/docker/volumes/static-jimr/oidc"
+
+- name: Render Pomerium config
+  template:
+    src: pomerium-config.yaml.j2
+    dest: "{{ supabase_dir }}/docker/volumes/pomerium/config.yaml"
+    mode: "0640"
+  register: pomerium_config_rendered
+
+- name: Render static sidecar nginx.conf
+  template:
+    src: static-nginx.conf.j2
+    dest: "{{ supabase_dir }}/docker/volumes/static-jimr/nginx.conf"
+    mode: "0644"
+  register: static_nginx_rendered
+
+- name: Render corrected OIDC discovery JSON
+  template:
+    src: openid-configuration.json.j2
+    dest: "{{ supabase_dir }}/docker/volumes/static-jimr/oidc/openid-configuration.json"
+    mode: "0644"
+  register: oidc_discovery_rendered
+
+# Stash the changed-status flags in role-scoped facts so the post-deploy
+# main.yml can decide whether to restart containers without re-running
+# the templates.
+- name: Stash pomerium template-change flags
+  set_fact:
+    pomerium_config_changed: "{{ pomerium_config_rendered is changed }}"
+    static_nginx_changed: "{{ static_nginx_rendered is changed or oidc_discovery_rendered is changed }}"

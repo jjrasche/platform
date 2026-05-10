@@ -1,60 +1,18 @@
 ---
 # Pomerium: identity-aware proxy + TLS terminator. Replaces Caddy when
-# pomerium_enabled=true. The supabase role's docker-compose.override.yml
-# conditionally drops the Caddy service on the same flag, so the two
-# proxies never compete for ports 80/443.
+# pomerium_enabled=true. Template rendering happens in render.yml,
+# included from the supabase role BEFORE compose-up so the bind-mount
+# sources exist by the time docker tries to start the containers.
 #
-# Required vault entries (generate before flipping the flag — see role README
-# in conversation handoff for `openssl rand -base64 32` snippets):
-#   vault_pomerium_cookie_secret    — 32 bytes base64
-#   vault_pomerium_shared_secret    — 32 bytes base64
-#   vault_pomerium_idp_client_id    — UUID, also inserted into auth.oauth_clients
-#   vault_pomerium_idp_client_secret — 32 bytes hex (raw, not hashed)
-#
-# Pomerium registers as an OIDC client in GoTrue's auth.oauth_clients table.
-# We insert directly because the GoTrue admin API (POST /admin/oauth/clients)
-# rejects HS256 service_role tokens after the OIDC cutover; the table-level
-# insert is the same path Gitea took before being ruled out for PKCE.
+# Required vault entries:
+#   vault_pomerium_cookie_secret      — 32 bytes base64
+#   vault_pomerium_shared_secret      — 32 bytes base64
+#   vault_pomerium_idp_client_id      — UUID, also inserted into auth.oauth_clients
+#   vault_pomerium_idp_client_secret  — 32 bytes hex (raw, not hashed)
 
-- name: Create Pomerium config directory on VPS
-  file:
-    path: "{{ supabase_dir }}/docker/volumes/pomerium"
-    state: directory
-    mode: "0755"
-
-- name: Create static sidecar config + content directories
-  file:
-    path: "{{ item }}"
-    state: directory
-    mode: "0755"
-  loop:
-    - "{{ supabase_dir }}/docker/volumes/static-jimr"
-    - "{{ supabase_dir }}/docker/volumes/static-jimr/oidc"
-
-- name: Render Pomerium config
-  template:
-    src: pomerium-config.yaml.j2
-    dest: "{{ supabase_dir }}/docker/volumes/pomerium/config.yaml"
-    mode: "0640"
-  register: pomerium_config_rendered
-
-- name: Render static sidecar nginx.conf
-  template:
-    src: static-nginx.conf.j2
-    dest: "{{ supabase_dir }}/docker/volumes/static-jimr/nginx.conf"
-    mode: "0644"
-  register: static_nginx_rendered
-
-- name: Render corrected OIDC discovery JSON
-  template:
-    src: openid-configuration.json.j2
-    dest: "{{ supabase_dir }}/docker/volumes/static-jimr/oidc/openid-configuration.json"
-    mode: "0644"
-  register: oidc_discovery_rendered
-
-# Pomerium + static-jimr are defined in the supabase role's compose override
-# (gated on pomerium_enabled). This role owns the config files only — service
-# lifecycle is driven by the supabase role's `Start Supabase stack` task.
+- name: Render Pomerium configs (in case supabase role was skipped via tags)
+  include_tasks: render.yml
+  when: pomerium_config_changed is not defined
 
 - name: Register Pomerium as OAuth client in GoTrue (auth.oauth_clients upsert)
   # The OIDC `client_id` parameter that Pomerium sends IS the row's uuid `id`
@@ -91,12 +49,16 @@
   register: pomerium_client_upsert
   changed_when: "'INSERT 0 1' in pomerium_client_upsert.stdout or 'UPDATE 1' in pomerium_client_upsert.stdout"
 
+# Compose-up in the supabase role started fresh containers with the new
+# templates, so a first-deploy restart isn't needed. On subsequent applies
+# where templates changed but the compose project didn't, restart picks up
+# the new file.
 - name: Restart Pomerium if config changed
   shell: docker restart $(docker ps --format '{% raw %}{{.Names}}{% endraw %}' | grep pomerium)
-  when: pomerium_config_rendered is changed
-  failed_when: false  # first apply: container doesn't exist yet, supabase role's compose-up will start it
+  when: pomerium_config_changed | default(false)
+  failed_when: false
 
 - name: Restart static-jimr if config or content changed
   shell: docker restart $(docker ps --format '{% raw %}{{.Names}}{% endraw %}' | grep static-jimr)
-  when: static_nginx_rendered is changed or oidc_discovery_rendered is changed
+  when: static_nginx_changed | default(false)
   failed_when: false

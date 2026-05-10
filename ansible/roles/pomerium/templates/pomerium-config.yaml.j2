@@ -61,16 +61,17 @@ routes:
     allow_public_unauthenticated_access: true
     preserve_host_header: true
 
-  # Static portal SPA at the root.
+  # Static portal SPA at the root. prefix_rewrite needs the trailing slash
+  # so Envoy turns /foo into /portal/foo, not /portalfoo.
   - from: https://{{ auth_domain }}
     to: http://static-jimr
-    prefix_rewrite: /portal
+    prefix_rewrite: /portal/
     allow_public_unauthenticated_access: true
 
   # ---- dm static client (public; auth happens client-side via GoTrue) ----
   - from: https://dm.jimr.fyi
     to: http://static-jimr
-    prefix_rewrite: /dm
+    prefix_rewrite: /dm/
     allow_public_unauthenticated_access: true
 
   # ---- Tenant frontends (public-at-gateway; Phase 2 will gate per-tenant) ----
@@ -110,7 +111,7 @@ routes:
   # apps.jimr.fyi served by static-jimr's autoindex (replaces Caddy file_server browse).
   - from: https://{{ app_distribution_domain }}
     to: http://static-jimr
-    prefix_rewrite: /apps
+    prefix_rewrite: /apps/
     policy:
       - allow:
           and:

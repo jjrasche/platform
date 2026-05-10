@@ -109,7 +109,10 @@ services:
 
 {% if pomerium_enabled | default(false) %}
   pomerium:
-    image: pomerium/pomerium:v0.32.7
+    # Outbound PKCE landed in main (PR #6061) but no v0.32.x release contains
+    # it — that branch was cut before the merge. SHA-pinned main image until
+    # the next minor release ships PKCE.
+    image: pomerium/pomerium:git-c84949b5
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true

@@ -28,6 +28,9 @@
     - { role: common, tags: [common] }
     - { role: monitoring, tags: [monitoring] }
     - { role: supabase, tags: [supabase] }
+    - role: pomerium
+      tags: [pomerium]
+      when: pomerium_enabled | default(false)
     - { role: app-distribution, tags: [app-distribution] }
     - { role: luanti, tags: [luanti] }
 

@@ -12,7 +12,22 @@ app_distribution_domain: apps.jimr.fyi
 monitoring_domain: status.jimr.fyi
 auth_domain: auth.jimr.fyi
 gitea_domain: git.jimr.fyi
+authenticate_domain: authenticate.jimr.fyi
 apk_retention_count: 5
+
+# Pomerium identity-aware proxy. When true, replaces Caddy as the TLS
+# terminator and gates Gitea/Studio/status/apps to jimjrasche@gmail.com.
+# Tenant frontends stay public-at-gateway in Phase 1 (Phase 2 = per-tenant
+# gating with bootstrap edits in tenant repos).
+#
+# Required vault entries before flipping to true (see roles/pomerium/tasks):
+#   vault_pomerium_cookie_secret      openssl rand -base64 32
+#   vault_pomerium_shared_secret      openssl rand -base64 32
+#   vault_pomerium_idp_client_id      uuidgen
+#   vault_pomerium_idp_client_secret  openssl rand -hex 32
+# Plus terraform/hetzner/main.tf needs the authenticate.jimr.fyi A record
+# applied so Pomerium's HTTP-01 LE challenge resolves.
+pomerium_enabled: false
 
 # OAuth 2.1 Server / asymmetric (ES256) JWT signing.
 # When true, GoTrue signs user JWTs with ES256 and exposes /oauth/authorize.

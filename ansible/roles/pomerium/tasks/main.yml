@@ -1,0 +1,90 @@
+---
+# Pomerium: identity-aware proxy + TLS terminator. Replaces Caddy when
+# pomerium_enabled=true. The supabase role's docker-compose.override.yml
+# conditionally drops the Caddy service on the same flag, so the two
+# proxies never compete for ports 80/443.
+#
+# Required vault entries (generate before flipping the flag — see role README
+# in conversation handoff for `openssl rand -base64 32` snippets):
+#   vault_pomerium_cookie_secret    — 32 bytes base64
+#   vault_pomerium_shared_secret    — 32 bytes base64
+#   vault_pomerium_idp_client_id    — UUID, also inserted into auth.oauth_clients
+#   vault_pomerium_idp_client_secret — 32 bytes hex (raw, not hashed)
+#
+# Pomerium registers as an OIDC client in GoTrue's auth.oauth_clients table.
+# We insert directly because the GoTrue admin API (POST /admin/oauth/clients)
+# rejects HS256 service_role tokens after the OIDC cutover; the table-level
+# insert is the same path Gitea took before being ruled out for PKCE.
+
+- name: Create Pomerium config directory on VPS
+  file:
+    path: "{{ supabase_dir }}/docker/volumes/pomerium"
+    state: directory
+    mode: "0755"
+
+- name: Create static sidecar config + content directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ supabase_dir }}/docker/volumes/static-jimr"
+    - "{{ supabase_dir }}/docker/volumes/static-jimr/oidc"
+
+- name: Render Pomerium config
+  template:
+    src: pomerium-config.yaml.j2
+    dest: "{{ supabase_dir }}/docker/volumes/pomerium/config.yaml"
+    mode: "0640"
+  register: pomerium_config_rendered
+
+- name: Render static sidecar nginx.conf
+  template:
+    src: static-nginx.conf.j2
+    dest: "{{ supabase_dir }}/docker/volumes/static-jimr/nginx.conf"
+    mode: "0644"
+  register: static_nginx_rendered
+
+- name: Render corrected OIDC discovery JSON
+  template:
+    src: openid-configuration.json.j2
+    dest: "{{ supabase_dir }}/docker/volumes/static-jimr/oidc/openid-configuration.json"
+    mode: "0644"
+  register: oidc_discovery_rendered
+
+# Pomerium + static-jimr are defined in the supabase role's compose override
+# (gated on pomerium_enabled). This role owns the config files only — service
+# lifecycle is driven by the supabase role's `Start Supabase stack` task.
+
+- name: Register Pomerium as OAuth client in GoTrue (auth.oauth_clients upsert)
+  shell: |
+    docker exec -i supabase-db psql -U supabase_admin -d postgres \
+      -v ON_ERROR_STOP=1 <<'SQL'
+    INSERT INTO auth.oauth_clients (id, client_id, client_secret_hash, registration_type, redirect_uris, client_name, token_endpoint_auth_method)
+    VALUES (
+      '{{ vault_pomerium_idp_client_id }}'::uuid,
+      '{{ vault_pomerium_idp_client_id }}',
+      crypt('{{ vault_pomerium_idp_client_secret }}', gen_salt('bf')),
+      'manual',
+      ARRAY['https://{{ authenticate_domain }}/oauth2/callback'],
+      'Pomerium IAP',
+      'client_secret_post'
+    )
+    ON CONFLICT (client_id) DO UPDATE SET
+      client_secret_hash = EXCLUDED.client_secret_hash,
+      redirect_uris = EXCLUDED.redirect_uris,
+      client_name = EXCLUDED.client_name,
+      token_endpoint_auth_method = EXCLUDED.token_endpoint_auth_method;
+    SQL
+  register: pomerium_client_upsert
+  changed_when: "'INSERT 0 1' in pomerium_client_upsert.stdout or 'UPDATE 1' in pomerium_client_upsert.stdout"
+
+- name: Restart Pomerium if config changed
+  shell: docker restart $(docker ps --format '{% raw %}{{.Names}}{% endraw %}' | grep pomerium)
+  when: pomerium_config_rendered is changed
+  failed_when: false  # first apply: container doesn't exist yet, supabase role's compose-up will start it
+
+- name: Restart static-jimr if config or content changed
+  shell: docker restart $(docker ps --format '{% raw %}{{.Names}}{% endraw %}' | grep static-jimr)
+  when: static_nginx_rendered is changed or oidc_discovery_rendered is changed
+  failed_when: false

@@ -167,6 +167,19 @@ resource "cloudflare_record" "git" {
   ttl     = 1
 }
 
+# Pomerium authenticate service — HTTP-01 LE challenge needs CF proxy off
+# during initial cert issuance, then can be flipped back on. If proxy stays
+# on, Pomerium falls back to TLS-ALPN-01 which requires direct port 443.
+# Cloudflare full-strict TLS handles either case.
+resource "cloudflare_record" "authenticate" {
+  zone_id = var.cloudflare_zone_id
+  name    = "authenticate"
+  content = hcloud_server.platform.ipv4_address
+  type    = "A"
+  proxied = true
+  ttl     = 1
+}
+
 # --- Luanti game server DNS (UDP — cannot be proxied) ---
 
 resource "cloudflare_record" "play" {

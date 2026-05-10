@@ -1,0 +1,69 @@
+# nginx sidecar serving every static surface that Pomerium can't proxy directly.
+# One server, location-scoped roots. Pomerium prefix_rewrites the public URL
+# down to the location prefix.
+
+worker_processes 1;
+
+events {
+  worker_connections 256;
+}
+
+http {
+  include /etc/nginx/mime.types;
+  default_type application/octet-stream;
+  sendfile on;
+  keepalive_timeout 65;
+
+  # WASM mime — dm's Kotlin/wasm bundle 404s without this.
+  types {
+    application/wasm wasm;
+  }
+
+  server {
+    listen 80;
+    server_name _;
+
+    # dm.jimr.fyi static SPA. auth-bootstrap.js + config.js are auth-critical;
+    # a stale cached copy after a flow-type or anon-key change locks users into
+    # a redirect loop. Force revalidation on every load.
+    location /dm/ {
+      alias /srv/dm/;
+      try_files $uri $uri/ /dm/index.html;
+      location ~ ^/dm/(auth-bootstrap\.js|config\.js)$ {
+        alias /srv/dm/$1;
+        add_header Cache-Control "no-cache, must-revalidate" always;
+      }
+    }
+
+    # auth.jimr.fyi static portal. Apply no-cache to ALL portal assets — the
+    # prior Caddy block had a comment explaining file_server's defaults
+    # (max-age=14400) override block-level headers; nginx is strict here.
+    location /portal/ {
+      alias /srv/portal/;
+      try_files $uri $uri/ /portal/index.html;
+      add_header Cache-Control "no-cache, must-revalidate" always;
+    }
+
+    # apps.jimr.fyi APK distribution browse + .apk content type.
+    location /apps/ {
+      alias /srv/apps/;
+      autoindex on;
+      types { application/vnd.android.package-archive apk; }
+      default_type application/octet-stream;
+    }
+
+    # Corrected OIDC discovery JSON (static), served at:
+    #   - /openid-configuration  (api.jimr.fyi/auth/v1/.well-known/openid-configuration)
+    #   - /oidc/.well-known/openid-configuration  (Pomerium idp_provider_url)
+    location = /openid-configuration {
+      alias /srv/oidc/openid-configuration.json;
+      default_type application/json;
+      add_header Cache-Control "public, max-age=300";
+    }
+    location = /oidc/.well-known/openid-configuration {
+      alias /srv/oidc/openid-configuration.json;
+      default_type application/json;
+      add_header Cache-Control "public, max-age=300";
+    }
+  }
+}

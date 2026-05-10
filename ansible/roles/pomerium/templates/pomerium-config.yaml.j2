@@ -1,0 +1,112 @@
+# Pomerium config — all-in-one mode, single binary serves authenticate + proxy.
+# Templated by ansible/roles/pomerium/tasks/main.yml. Do not edit on the host.
+
+authenticate_service_url: https://{{ authenticate_domain }}
+
+cookie_secret: {{ vault_pomerium_cookie_secret }}
+shared_secret: {{ vault_pomerium_shared_secret }}
+
+# OIDC against GoTrue. The discovery doc upstream-served by GoTrue v2.186 has
+# wrong issuer + relative URLs; static-jimr serves a corrected JSON at
+# /openid-configuration. idp_provider_url points at the directory whose
+# /.well-known/openid-configuration Pomerium auto-resolves.
+idp_provider: oidc
+idp_provider_url: http://static-jimr/oidc
+idp_client_id: {{ vault_pomerium_idp_client_id }}
+idp_client_secret: {{ vault_pomerium_idp_client_secret }}
+idp_scopes:
+  - openid
+  - email
+  - profile
+
+# HTTP-01 LE issuance. Port 80 must be free; cutover stops Caddy first.
+autocert: true
+autocert_email: jimjrasche@gmail.com
+autocert_dir: /data/autocert
+
+# Header forwarding defaults — per-route overrides below where needed.
+jwt_claims_headers:
+  - email
+  - sub
+
+routes:
+  # ---- API / Supabase ----
+  # Specific path FIRST: corrected OIDC discovery JSON for api.jimr.fyi.
+  - from: https://{{ supabase_api_domain }}
+    prefix: /auth/v1/.well-known/openid-configuration
+    to: http://static-jimr
+    prefix_rewrite: /openid-configuration
+    allow_public_unauthenticated_access: true
+    preserve_host_header: false
+
+  # Everything else on api.jimr.fyi → Kong (rest, auth, realtime, storage, functions).
+  - from: https://{{ supabase_api_domain }}
+    to: http://kong:8000
+    allow_public_unauthenticated_access: true
+    preserve_host_header: true
+    allow_websockets: true
+
+  # ---- Auth portal ----
+  # /auth/v1/* hits GoTrue via Kong (recovery email links + OAuth Server endpoints
+  # resolve at the same host as SITE_URL).
+  - from: https://{{ auth_domain }}
+    prefix: /auth/v1/
+    to: http://kong:8000
+    allow_public_unauthenticated_access: true
+    preserve_host_header: true
+
+  # Static portal SPA at the root.
+  - from: https://{{ auth_domain }}
+    to: http://static-jimr
+    prefix_rewrite: /portal
+    allow_public_unauthenticated_access: true
+
+  # ---- dm static client (public; auth happens client-side via GoTrue) ----
+  - from: https://dm.jimr.fyi
+    to: http://static-jimr
+    prefix_rewrite: /dm
+    allow_public_unauthenticated_access: true
+
+  # ---- Tenant frontends (public-at-gateway; Phase 2 will gate per-tenant) ----
+{% for tenant in tenants if tenant.name != 'dungeon-master' %}
+  - from: https://{{ tenant.domain }}
+    to: http://frontend-{{ tenant.name }}:80
+    allow_public_unauthenticated_access: true
+{% endfor %}
+
+  # ---- Gated routes (jimjrasche@gmail.com only) ----
+  - from: https://{{ gitea_domain }}
+    to: http://gitea:3000
+    pass_identity_headers: true
+    policy:
+      - allow:
+          and:
+            - email:
+                is: jimjrasche@gmail.com
+
+  - from: https://{{ supabase_studio_domain }}
+    to: http://studio:3000
+    pass_identity_headers: true
+    policy:
+      - allow:
+          and:
+            - email:
+                is: jimjrasche@gmail.com
+
+  - from: https://{{ monitoring_domain }}
+    to: http://gatus:8080
+    policy:
+      - allow:
+          and:
+            - email:
+                is: jimjrasche@gmail.com
+
+  # apps.jimr.fyi served by static-jimr's autoindex (replaces Caddy file_server browse).
+  - from: https://{{ app_distribution_domain }}
+    to: http://static-jimr
+    prefix_rewrite: /apps
+    policy:
+      - allow:
+          and:
+            - email:
+                is: jimjrasche@gmail.com

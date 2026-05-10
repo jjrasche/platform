@@ -197,6 +197,28 @@
     - caddyfile_result is changed
   register: caddy_restarted
 
+# When pomerium_enabled and the templates changed, restart pomerium / static-jimr
+# HERE — before the post-deploy verify gates. The pomerium role runs AFTER
+# supabase, so any restart in that role can't run if a verify gate fails first.
+# compose-up creates new containers on first apply; on subsequent applies a
+# config-only change leaves the running container with the old mount, so
+# explicit restart is required to pick up the rendered templates.
+- name: Restart Pomerium when templates changed
+  shell: docker restart supabase-pomerium-1
+  when:
+    - pomerium_enabled | default(false)
+    - pomerium_config_changed | default(false)
+  failed_when: false
+  changed_when: false
+
+- name: Restart static-jimr when templates changed
+  shell: docker restart supabase-static-jimr-1
+  when:
+    - pomerium_enabled | default(false)
+    - static_nginx_changed | default(false)
+  failed_when: false
+  changed_when: false
+
 - name: Wait for Postgres
   shell: docker exec supabase-db pg_isready -U supabase_admin
   register: pg_ready

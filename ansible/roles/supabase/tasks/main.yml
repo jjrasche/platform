@@ -155,17 +155,6 @@
   include_role:
     name: pomerium
     tasks_from: render
-  when: pomerium_enabled | default(false)
-
-# Caddy must vacate ports 80/443 before Pomerium can claim them.
-# `state: present` removes the orphan service eventually, but compose's
-# parallel start brings up Pomerium before stopping Caddy → port
-# conflict. Explicit pre-stop is idempotent.
-- name: Stop legacy Caddy when Pomerium is taking over
-  shell: docker stop supabase-caddy-1 && docker rm supabase-caddy-1
-  when: pomerium_enabled | default(false)
-  failed_when: false
-  changed_when: false
 
 - name: Start Supabase stack
   community.docker.docker_compose_v2:
@@ -174,25 +163,21 @@
     remove_orphans: true
     pull: "{{ 'always' if (vault_ghcr_token is defined and vault_ghcr_token != 'CHANGE_ME') else 'missing' }}"
 
-# When pomerium_enabled and the templates changed, restart pomerium / static-jimr
-# HERE — before the post-deploy verify gates. The pomerium role runs AFTER
+# Restart pomerium / static-jimr HERE when their templates changed —
+# before the post-deploy verify gates. The pomerium role runs AFTER
 # supabase, so any restart in that role can't run if a verify gate fails first.
 # compose-up creates new containers on first apply; on subsequent applies a
 # config-only change leaves the running container with the old mount, so
 # explicit restart is required to pick up the rendered templates.
 - name: Restart Pomerium when templates changed
   shell: docker restart supabase-pomerium-1
-  when:
-    - pomerium_enabled | default(false)
-    - pomerium_config_changed | default(false)
+  when: pomerium_config_changed | default(false)
   failed_when: false
   changed_when: false
 
 - name: Restart static-jimr when templates changed
   shell: docker restart supabase-static-jimr-1
-  when:
-    - pomerium_enabled | default(false)
-    - static_nginx_changed | default(false)
+  when: static_nginx_changed | default(false)
   failed_when: false
   changed_when: false
 
@@ -218,7 +203,6 @@
       WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'pomerium')
     \gexec
     SQL
-  when: pomerium_enabled | default(false)
   register: pomerium_db_setup
   changed_when: pomerium_db_setup.stdout is search('CREATE DATABASE')
   no_log: true
@@ -228,9 +212,7 @@
 # the running container reconnects cleanly instead of waiting for backoff.
 - name: Restart Pomerium after databroker DB created
   shell: docker restart supabase-pomerium-1
-  when:
-    - pomerium_enabled | default(false)
-    - pomerium_db_setup is changed
+  when: pomerium_db_setup is changed
   failed_when: false
   changed_when: false
 

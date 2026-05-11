@@ -38,7 +38,6 @@ services:
       GITEA__security__INSTALL_LOCK: "true"
       GITEA__security__SECRET_KEY: "{{ vault_gitea_secret_key }}"
       GITEA__service__DISABLE_REGISTRATION: "true"
-{% if pomerium_enabled | default(false) %}
       # Pomerium is the only path to Gitea — trust the X-Pomerium-Claim-Email
       # header (set by `pass_identity_headers: true` on the route). Auto-
       # registration creates a Gitea user on first login keyed off the
@@ -57,7 +56,6 @@ services:
       GITEA__security__REVERSE_PROXY_AUTHENTICATION_USER: "X-Pomerium-Claim-Email"
       GITEA__security__REVERSE_PROXY_AUTHENTICATION_EMAIL: "X-Pomerium-Claim-Email"
       GITEA__security__REVERSE_PROXY_TRUSTED_PROXIES: "172.16.0.0/12"
-{% endif %}
     volumes:
       - gitea_data:/data
     networks:
@@ -79,7 +77,6 @@ services:
     networks:
       - frontend
 
-{% if pomerium_enabled | default(false) %}
   pomerium:
     # Outbound PKCE landed in main (PR #6061) but no v0.32.x release contains
     # it — that branch was cut before the merge. SHA-pinned main image until
@@ -136,7 +133,6 @@ services:
       - /opt/app-dist:/srv/apps:ro
     networks:
       - frontend
-{% endif %}
 
   studio:
     security_opt:
@@ -334,6 +330,4 @@ networks:
 volumes:
   gatus_data:
   gitea_data:
-{% if pomerium_enabled | default(false) %}
   pomerium_data:
-{% endif %}

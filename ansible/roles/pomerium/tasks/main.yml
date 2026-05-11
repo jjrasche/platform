@@ -1,8 +1,8 @@
 ---
-# Pomerium: identity-aware proxy + TLS terminator. Replaces Caddy when
-# pomerium_enabled=true. Template rendering happens in render.yml,
-# included from the supabase role BEFORE compose-up so the bind-mount
-# sources exist by the time docker tries to start the containers.
+# Pomerium: identity-aware proxy + TLS terminator. Template rendering
+# happens in render.yml, included from the supabase role BEFORE compose-up
+# so the bind-mount sources exist by the time docker tries to start the
+# containers.
 #
 # Required vault entries:
 #   vault_pomerium_cookie_secret      — 32 bytes base64

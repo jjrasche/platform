@@ -216,6 +216,38 @@
   failed_when: false
   changed_when: false
 
+# Strip stale Gitea reverse-proxy INI keys carried over from an earlier
+# cutover that used the wrong key names. The correct keys
+# (REVERSE_PROXY_AUTHENTICATION_USER/EMAIL) are written via env vars on
+# the compose service; the stale ones (..._HEADER, ..._EMAIL_HEADER) live
+# in app.ini inside the named volume and survive container rebuilds.
+# Sed-stripped manually on VPS1 2026-05-11; this task makes the cleanup
+# idempotent for any future restore-from-backup that resurrects an older
+# app.ini. wait_for guards against the rare first-boot race where Gitea
+# hasn't written app.ini yet.
+- name: Wait for Gitea app.ini to be written
+  wait_for:
+    path: "{{ gitea_app_ini_path }}"
+    timeout: 60
+  vars:
+    gitea_app_ini_path: /var/lib/docker/volumes/supabase_gitea_data/_data/gitea/conf/app.ini
+
+- name: Strip stale Gitea reverse-proxy header keys from app.ini
+  community.general.ini_file:
+    path: /var/lib/docker/volumes/supabase_gitea_data/_data/gitea/conf/app.ini
+    section: security
+    option: "{{ item }}"
+    state: absent
+  loop:
+    - REVERSE_PROXY_AUTHENTICATION_HEADER
+    - REVERSE_PROXY_EMAIL_HEADER
+  register: gitea_app_ini_stripped
+
+- name: Restart Gitea if stale app.ini keys were stripped
+  shell: docker restart supabase-gitea-1
+  when: gitea_app_ini_stripped is changed
+  changed_when: gitea_app_ini_stripped is changed
+
 - name: Create tenant databases
   shell: |
     docker exec supabase-db psql -U supabase_admin -d postgres -tc \

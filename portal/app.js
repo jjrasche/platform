@@ -293,6 +293,31 @@ async function handleAuthorize(sb, session, overrideAuthId) {
 
   showView("authorize");
 
+  // GoTrue's /oauth/authorize creates the authorization row with user_id=NULL
+  // (Pomerium redirects the browser there before the user has a GoTrue
+  // session). GoTrue's POST /consent requires user_id to be set and match
+  // the caller, otherwise it returns 404 "authorization belongs to different
+  // user". GET /oauth/authorizations/{id} runs SetUser server-side and
+  // returns the authorization details for display. We discard the body —
+  // calling it is the side-effect we want.
+  const bindResponse = await fetch(
+    `${SUPABASE_URL}/auth/v1/oauth/authorizations/${authorizationId}`,
+    {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${session.access_token}`,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+    },
+  );
+  if (!bindResponse.ok) {
+    const text = await bindResponse.text();
+    console.error("authorization binding failed", bindResponse.status, text);
+    showLoginView();
+    showError(`Authorization failed: ${bindResponse.status} ${text}`);
+    return;
+  }
+
   const response = await fetch(
     `${SUPABASE_URL}/auth/v1/oauth/authorizations/${authorizationId}/consent`,
     {

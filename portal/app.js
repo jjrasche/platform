@@ -318,6 +318,17 @@ async function handleAuthorize(sb, session, overrideAuthId) {
     return;
   }
 
+  // When the user already has an active consent for this client, GoTrue's
+  // GET handler auto-approves and returns {redirect_url:"..."}. Status flips
+  // pending → approved server-side; calling POST /consent after that yields
+  // 400 "authorization request cannot be processed". Honor the redirect.
+  const bindBody = await bindResponse.json().catch(() => ({}));
+  const bindRedirect = bindBody.redirect_url || bindBody.redirect_to || bindBody.redirect_uri;
+  if (bindRedirect) {
+    window.location.href = bindRedirect;
+    return;
+  }
+
   const response = await fetch(
     `${SUPABASE_URL}/auth/v1/oauth/authorizations/${authorizationId}/consent`,
     {

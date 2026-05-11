@@ -79,43 +79,6 @@ services:
     networks:
       - frontend
 
-{% if not (pomerium_enabled | default(false)) %}
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_BIND_SERVICE
-    read_only: true
-    tmpfs:
-      - /tmp
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./volumes/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-      - /opt/app-dist:/opt/app-dist:ro
-      - /opt/auth-portal:/opt/auth-portal:ro
-      - /var/www/dungeon-master:/var/www/dungeon-master:ro
-      - /var/log/caddy:/var/log/caddy
-    depends_on:
-      - kong
-      - gatus
-      - gitea
-{% for tenant in tenants if tenant.name != 'dungeon-master' %}
-      - frontend-{{ tenant.name }}
-{% endfor %}
-    networks:
-      - frontend
-      - default
-{% endif %}
-
 {% if pomerium_enabled | default(false) %}
   pomerium:
     # Outbound PKCE landed in main (PR #6061) but no v0.32.x release contains
@@ -369,10 +332,6 @@ networks:
   frontend:
 
 volumes:
-{% if not (pomerium_enabled | default(false)) %}
-  caddy_data:
-  caddy_config:
-{% endif %}
   gatus_data:
   gitea_data:
 {% if pomerium_enabled | default(false) %}

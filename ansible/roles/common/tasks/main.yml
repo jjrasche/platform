@@ -211,6 +211,39 @@
     mode: "0644"
   notify: restart fail2ban
 
+# Pomerium IAP brute-force protection — see files/fail2ban-pomerium-*.conf
+# for the regex, the threat model, and why we ban via the DOCKER-USER
+# iptables chain rather than INPUT.
+
+- name: Install fail2ban filter for Pomerium auth denials
+  copy:
+    src: fail2ban-pomerium-filter.conf
+    dest: /etc/fail2ban/filter.d/pomerium-auth.conf
+    mode: "0644"
+  notify: restart fail2ban
+
+- name: Install fail2ban jail for Pomerium auth denials
+  copy:
+    src: fail2ban-pomerium-jail.conf
+    dest: /etc/fail2ban/jail.d/pomerium-auth.conf
+    mode: "0644"
+  notify: restart fail2ban
+
+- name: Ensure fail2ban systemd drop-in directory exists
+  file:
+    path: /etc/systemd/system/fail2ban.service.d
+    state: directory
+    mode: "0755"
+
+- name: Install fail2ban systemd ordering drop-in (start after docker)
+  copy:
+    src: fail2ban-after-docker.conf
+    dest: /etc/systemd/system/fail2ban.service.d/after-docker.conf
+    mode: "0644"
+  notify:
+    - reload systemd
+    - restart fail2ban
+
 - name: Start and enable fail2ban
   systemd:
     name: fail2ban

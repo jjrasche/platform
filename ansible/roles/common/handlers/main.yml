@@ -3,3 +3,7 @@
   systemd:
     name: fail2ban
     state: restarted
+
+- name: reload systemd
+  systemd:
+    daemon_reload: true

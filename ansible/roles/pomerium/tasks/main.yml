@@ -22,14 +22,18 @@
   # generates id+secret server-side and only returns the secret on create;
   # Pomerium needs both pre-known so its config is reproducible.
   shell: |
+    SECRET_HASH=$(printf '%s' '{{ vault_pomerium_idp_client_secret }}' \
+      | openssl dgst -sha256 -binary | openssl base64 -A \
+      | tr '+/' '-_' | tr -d '=')
     docker exec -i supabase-db psql -U supabase_admin -d postgres \
-      -v ON_ERROR_STOP=1 <<'SQL'
+      -v ON_ERROR_STOP=1 \
+      -v hash="$SECRET_HASH" <<'SQL'
     INSERT INTO auth.oauth_clients (
       id, client_secret_hash, registration_type, redirect_uris,
       grant_types, client_name, token_endpoint_auth_method, client_type
     ) VALUES (
       '{{ vault_pomerium_idp_client_id }}'::uuid,
-      crypt('{{ vault_pomerium_idp_client_secret }}', gen_salt('bf')),
+      :'hash',
       'manual',
       'https://{{ authenticate_domain }}/oauth2/callback',
       'authorization_code,refresh_token',
@@ -48,6 +52,7 @@
     SQL
   register: pomerium_client_upsert
   changed_when: "'INSERT 0 1' in pomerium_client_upsert.stdout or 'UPDATE 1' in pomerium_client_upsert.stdout"
+  no_log: true
 
 # Compose-up in the supabase role started fresh containers with the new
 # templates, so a first-deploy restart isn't needed. On subsequent applies

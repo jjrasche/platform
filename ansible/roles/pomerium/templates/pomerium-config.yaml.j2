@@ -27,8 +27,15 @@ set_response_headers:
 # idp_provider_url, the discovery doc's `issuer`, and GoTrue's minted-token
 # `iss`. GoTrue mints iss=https://api.jimr.fyi/auth/v1, so Pomerium uses the
 # public URL too. Pomerium loopback-fetches the discovery doc through its
-# own route on api.jimr.fyi (which proxies to static-jimr's corrected JSON,
-# fixing GoTrue v2.186's broken empty-issuer discovery).
+# own route on api.jimr.fyi (which proxies to static-jimr's corrected JSON).
+#
+# 2026-05-11 re-check: GoTrue's NATIVE discovery at auth:9999 is now correct
+# (issuer + absolute URLs), so the JSON contents of the static override no
+# longer matter. The override route survives because Kong's `auth-v1` catchall
+# gates /auth/v1/* behind an apikey, and Pomerium's loopback fetch carries
+# none. Killing the override would also require opening a Kong route for
+# /auth/v1/.well-known/openid-configuration (mirroring the existing open
+# routes for jwks.json and /oauth/*).
 idp_provider: oidc
 idp_provider_url: https://{{ supabase_api_domain }}/auth/v1
 idp_client_id: {{ vault_pomerium_idp_client_id }}

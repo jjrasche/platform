@@ -52,9 +52,14 @@ http {
       default_type application/octet-stream;
     }
 
-    # Corrected OIDC discovery JSON (static), served at:
-    #   - /openid-configuration  (api.jimr.fyi/auth/v1/.well-known/openid-configuration)
-    #   - /oidc/.well-known/openid-configuration  (Pomerium idp_provider_url)
+    # OIDC discovery JSON, served at /openid-configuration. Pomerium's
+    # api.jimr.fyi route prefix-rewrites /auth/v1/.well-known/openid-
+    # configuration to this location. Originally added to paper over
+    # GoTrue v2.186's broken (empty-issuer, relative-URL) discovery doc.
+    # 2026-05-11 re-check: GoTrue's NATIVE discovery is now correct, so
+    # the contents of this file no longer matter — but the route still
+    # has to terminate somewhere because Kong's `auth-v1` catchall gates
+    # /auth/v1/* behind an apikey that Pomerium's loopback can't supply.
     location = /openid-configuration {
       alias /srv/oidc/openid-configuration.json;
       default_type application/json;

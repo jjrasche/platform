@@ -46,7 +46,12 @@ services:
       GITEA__service__ENABLE_REVERSE_PROXY_AUTHENTICATION: "true"
       GITEA__service__ENABLE_REVERSE_PROXY_AUTO_REGISTRATION: "true"
       GITEA__service__ENABLE_REVERSE_PROXY_EMAIL: "true"
+      # Gitea's Verify() tries AUTH_USER (header → username lookup) first,
+      # then falls back to EMAIL_HEADER (header → email lookup). Pomerium's
+      # X-Pomerium-Claim-Email carries the email; existing user "jim" has
+      # that email, so the email lookup matches.
       GITEA__security__REVERSE_PROXY_AUTHENTICATION_HEADER: "X-Pomerium-Claim-Email"
+      GITEA__security__REVERSE_PROXY_EMAIL_HEADER: "X-Pomerium-Claim-Email"
       GITEA__security__REVERSE_PROXY_TRUSTED_PROXIES: "172.16.0.0/12"
 {% endif %}
     volumes:

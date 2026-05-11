@@ -124,6 +124,14 @@ tenants:
     database: minecraft_companion
     repo: minecraft-companion
 
+  # agent-platform runs on VPS2 (provisioned by its own deploy). This entry
+  # is purely for APK distribution on VPS1's apps.jimr.fyi — no domain or
+  # database needed here. Slug "agentplatform" matches Android app id.
+  - name: agent-platform
+    repo: agent-platform
+    apps:
+      - slug: agentplatform
+
   # dungeon-master uses the shared `postgres` DB (per D13) for cross-schema
   # FKs to auth.users — no per-tenant database is created.
   # The container itself self-deploys via dungeon-master's GitHub Actions

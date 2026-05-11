@@ -15,6 +15,16 @@ name: Android APK Build and Deploy
 #         min_version: '0.1.0'
 #       secrets: inherit
 #
+# For pure-Kotlin Android (no Expo), set kind: native; optionally override
+# gradle_task + apk_path if your module name isn't :app. Example:
+#   with:
+#     app_slug: agentplatform
+#     app_dir: .
+#     min_version: '0.1.0'
+#     kind: native
+#     gradle_task: ':refactor-android-app:assembleRelease'
+#     apk_path: 'refactor/android-app/build/outputs/apk/release/android-app-release.apk'
+#
 # Required repository secrets (set in GitHub repo settings):
 #   KEYSTORE_BASE64       - base64-encoded release keystore
 #   KEYSTORE_PASSWORD     - keystore password
@@ -45,6 +55,16 @@ on:
         type: string
         default: "expo"
         description: "'expo' runs npx expo prebuild (existing Expo apps). 'native' skips it for pure-Kotlin Android projects."
+      gradle_task:
+        required: false
+        type: string
+        default: ":app:assembleRelease"
+        description: "Gradle task (native only). Default :app:assembleRelease matches the convention; override for projects with non-standard module names."
+      apk_path:
+        required: false
+        type: string
+        default: "app/build/outputs/apk/release/app-release.apk"
+        description: "Relative path under app_dir to the produced APK (native only). Default matches :app:assembleRelease output."
     secrets:
       KEYSTORE_BASE64:
         required: true
@@ -141,7 +161,7 @@ jobs:
         if: inputs.kind == 'native'
         run: |
           chmod +x ./gradlew
-          ./gradlew :app:assembleRelease \
+          ./gradlew ${{ inputs.gradle_task }} \
             -Pandroid.injected.signing.store.file=/tmp/release.jks \
             -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
             -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
@@ -162,7 +182,7 @@ jobs:
         if: inputs.kind == 'native'
         with:
           name: signed-apk
-          path: ${{ inputs.app_dir }}/app/build/outputs/apk/release/app-release.apk
+          path: ${{ inputs.app_dir }}/${{ inputs.apk_path }}
           retention-days: 7
 
   upload:

@@ -217,6 +217,9 @@ services:
       # empty GOTRUE_JWT_KEYS at boot, so this block must be absent when unset.
       GOTRUE_JWT_KEYS: ${GOTRUE_JWT_KEYS}
       GOTRUE_JWT_VALID_METHODS: ${GOTRUE_JWT_VALID_METHODS}
+      # OAuth ID token iss claim — upstream supabase compose doesn't pass
+      # this from .env, so it gets injected here.
+      GOTRUE_JWT_ISSUER: ${GOTRUE_JWT_ISSUER}
 {% endif %}
 {% endif %}
 

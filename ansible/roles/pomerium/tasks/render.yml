@@ -47,6 +47,24 @@
   register: pomerium_key_rendered
   no_log: true
 
+- name: Drop Cloudflare Origin Certificate for practice.exchange (2nd zone)
+  copy:
+    content: "{{ vault_pomerium_exchange_cert | default('') }}"
+    dest: "{{ supabase_dir }}/docker/volumes/pomerium/certs/exchange.crt"
+    mode: "0644"
+  register: pomerium_exchange_cert_rendered
+  when: vault_pomerium_exchange_cert is defined
+  no_log: true
+
+- name: Drop Cloudflare Origin private key for practice.exchange (2nd zone)
+  copy:
+    content: "{{ vault_pomerium_exchange_key | default('') }}"
+    dest: "{{ supabase_dir }}/docker/volumes/pomerium/certs/exchange.key"
+    mode: "0600"
+  register: pomerium_exchange_key_rendered
+  when: vault_pomerium_exchange_key is defined
+  no_log: true
+
 - name: Render static sidecar nginx.conf
   template:
     src: static-nginx.conf.j2
@@ -66,5 +84,5 @@
 # the templates.
 - name: Stash pomerium template-change flags
   set_fact:
-    pomerium_config_changed: "{{ pomerium_config_rendered is changed or pomerium_cert_rendered is changed or pomerium_key_rendered is changed }}"
+    pomerium_config_changed: "{{ pomerium_config_rendered is changed or pomerium_cert_rendered is changed or pomerium_key_rendered is changed or (pomerium_exchange_cert_rendered.changed | default(false)) or (pomerium_exchange_key_rendered.changed | default(false)) }}"
     static_nginx_changed: "{{ static_nginx_rendered is changed or oidc_discovery_rendered is changed }}"

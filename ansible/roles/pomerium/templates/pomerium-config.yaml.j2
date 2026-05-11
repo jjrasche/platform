@@ -31,6 +31,11 @@ idp_scopes:
 certificates:
   - cert: /pomerium/certs/origin.crt
     key: /pomerium/certs/origin.key
+  # practice.exchange runs in a separate CF zone; its own Origin Cert
+  # (SAN: *.practice.exchange, practice.exchange). Pomerium picks the
+  # right cert per SNI match.
+  - cert: /pomerium/certs/exchange.crt
+    key: /pomerium/certs/exchange.key
 
 # Header forwarding defaults — per-route overrides below where needed.
 jwt_claims_headers:

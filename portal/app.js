@@ -276,8 +276,10 @@ function bindResetButtons(sb) {
   });
 }
 
-async function handleAuthorize(sb, session) {
-  const authorizationId = parseAuthorizationId();
+async function handleAuthorize(sb, session, overrideAuthId) {
+  // overrideAuthId lets handlePostLogin skip the navigate→reload→re-parse
+  // round trip, which was losing state between sign-in and consent.
+  const authorizationId = overrideAuthId || parseAuthorizationId();
   if (!authorizationId) {
     if (session) return showSignedIn(sb, session);
     return showLoginView();
@@ -327,9 +329,10 @@ async function handlePostLogin(sb, session) {
   const pendingAuthId = sessionStorage.getItem("pending_authorization_id");
   if (pendingAuthId) {
     sessionStorage.removeItem("pending_authorization_id");
-    window.location.href =
-      `/authorize?authorization_id=${encodeURIComponent(pendingAuthId)}`;
-    return;
+    // Call handleAuthorize directly with the auth_id — avoids a full page
+    // reload where the SPA was sometimes landing in the signedIn view
+    // instead of running the consent POST.
+    return handleAuthorize(sb, session, pendingAuthId);
   }
 
   const returnTo = readReturnTo();

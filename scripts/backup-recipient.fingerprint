@@ -1,0 +1,6 @@
+# Full 40-char GPG fingerprint of the backup recipient key.
+# One line, hex only, no spaces, no 0x prefix. Comments allowed (lines starting with #).
+# Generate via the runbook at docs/runbooks/backup-restore.md, then paste below.
+#
+# Example (DO NOT use this value — it is invalid):
+# AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555

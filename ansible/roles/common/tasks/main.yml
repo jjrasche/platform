@@ -35,10 +35,18 @@
     name:
       - ca-certificates
       - curl
-      - gnupg
       - git
       - postgresql-client
     state: present
+
+# gnupg is pinned by version per the "pin everything" rule. The backup pipeline
+# encrypts pg_dump output to a public key; a silent gnupg ABI change must not
+# break decryption.
+- name: Install pinned gnupg for backup encryption
+  apt:
+    name: "gnupg=2.4.4-2ubuntu17.4"
+    state: present
+    allow_downgrade: true
 
 - name: Check if swap file exists
   stat:
@@ -107,11 +115,50 @@
     state: directory
     mode: "0700"
 
+# Dedicated GNUPGHOME for the backup keyring. Root-only; backup cron runs as
+# root. Holds ONLY the public key — the private key stays offline. See
+# docs/runbooks/backup-restore.md.
+- name: Create backup GPG home
+  file:
+    path: "{{ backup_dir }}/.gnupg"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
 - name: Deploy platform scripts
   copy:
     src: "{{ playbook_dir }}/../scripts/"
     dest: "{{ apps_dir }}/scripts/"
     mode: "0755"
+
+# Encrypt-at-source: backup.sh pipes pg_dump → gzip → gpg --encrypt before
+# writing to /opt/backups. The recipient public key is committed in the repo;
+# the matching private key lives offline in Jim's password manager. If the
+# .asc file is still the repo's placeholder, skip the import and warn — the
+# nightly script will refuse to run until a real key is present.
+- name: Detect whether backup public key is real (not the placeholder)
+  ansible.builtin.command:
+    cmd: grep -q "BEGIN PGP PUBLIC KEY BLOCK" "{{ apps_dir }}/scripts/backup-public.asc"
+  register: backup_pubkey_present
+  changed_when: false
+  failed_when: false
+
+- name: Import backup public key into VPS keyring
+  ansible.builtin.command:
+    cmd: >-
+      gpg --homedir {{ backup_dir }}/.gnupg --batch --yes
+      --import {{ apps_dir }}/scripts/backup-public.asc
+  when: backup_pubkey_present.rc == 0
+  changed_when: false
+
+- name: Warn when backup public key is still the placeholder
+  ansible.builtin.debug:
+    msg: >-
+      scripts/backup-public.asc is still the placeholder. Nightly backups will
+      FAIL until you generate a keypair (see docs/runbooks/backup-restore.md),
+      commit the public key + fingerprint, and re-run this playbook.
+  when: backup_pubkey_present.rc != 0
 
 - name: Create daily backup cron
   cron:

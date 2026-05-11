@@ -6,6 +6,23 @@ authenticate_service_url: https://{{ authenticate_domain }}
 cookie_secret: {{ vault_pomerium_cookie_secret }}
 shared_secret: {{ vault_pomerium_shared_secret }}
 
+# Single cookie shared across all *.jimr.fyi routes — one sign-in covers all.
+# practice.exchange is a different apex; cross-domain SSO falls back to
+# Pomerium's signed-query-param session share (works without shared cookies).
+cookie_domain: jimr.fyi
+
+# Postgres-backed databroker keeps sessions across Pomerium restarts.
+# In-memory default loses everyone on every container restart.
+databroker_storage_type: postgres
+databroker_storage_connection_string: postgres://pomerium_db:{{ vault_pomerium_db_password }}@db:5432/pomerium?sslmode=disable
+
+# Baseline security response headers applied to every route.
+set_response_headers:
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  X-Content-Type-Options: "nosniff"
+  X-Frame-Options: "SAMEORIGIN"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+
 # OIDC against GoTrue. Three values must agree on the issuer string:
 # idp_provider_url, the discovery doc's `issuer`, and GoTrue's minted-token
 # `iss`. GoTrue mints iss=https://api.jimr.fyi/auth/v1, so Pomerium uses the

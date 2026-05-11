@@ -226,6 +226,38 @@
   delay: 5
   until: pg_ready.rc == 0
 
+- name: Create Pomerium databroker database + role
+  shell: |
+    docker exec -i supabase-db psql -U supabase_admin -d postgres \
+      -v ON_ERROR_STOP=1 \
+      -v pw="{{ vault_pomerium_db_password }}" <<'SQL'
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pomerium_db') THEN
+        EXECUTE format('CREATE ROLE pomerium_db LOGIN PASSWORD %L', :'pw');
+      ELSE
+        EXECUTE format('ALTER ROLE pomerium_db PASSWORD %L', :'pw');
+      END IF;
+    END $$;
+    SELECT 'CREATE DATABASE pomerium OWNER pomerium_db'
+      WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'pomerium')
+    \gexec
+    SQL
+  when: pomerium_enabled | default(false)
+  register: pomerium_db_setup
+  changed_when: pomerium_db_setup.stdout is search('CREATE DATABASE')
+  no_log: true
+
+# Pomerium starts before this task on first deploy and crashloops trying
+# to connect to a non-existent database. Once the DB exists, restart so
+# the running container reconnects cleanly instead of waiting for backoff.
+- name: Restart Pomerium after databroker DB created
+  shell: docker restart supabase-pomerium-1
+  when:
+    - pomerium_enabled | default(false)
+    - pomerium_db_setup is changed
+  failed_when: false
+  changed_when: false
+
 - name: Create tenant databases
   shell: |
     docker exec supabase-db psql -U supabase_admin -d postgres -tc \

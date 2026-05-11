@@ -231,13 +231,12 @@
     docker exec -i supabase-db psql -U supabase_admin -d postgres \
       -v ON_ERROR_STOP=1 \
       -v pw="{{ vault_pomerium_db_password }}" <<'SQL'
-    DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pomerium_db') THEN
-        EXECUTE format('CREATE ROLE pomerium_db LOGIN PASSWORD %L', :'pw');
-      ELSE
-        EXECUTE format('ALTER ROLE pomerium_db PASSWORD %L', :'pw');
-      END IF;
-    END $$;
+    SELECT 'CREATE ROLE pomerium_db LOGIN PASSWORD ' || quote_literal(:'pw')
+      WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pomerium_db')
+    \gexec
+    SELECT 'ALTER ROLE pomerium_db PASSWORD ' || quote_literal(:'pw')
+      WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pomerium_db')
+    \gexec
     SELECT 'CREATE DATABASE pomerium OWNER pomerium_db'
       WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'pomerium')
     \gexec

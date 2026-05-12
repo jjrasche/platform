@@ -220,20 +220,34 @@ jobs:
     needs: upload
     runs-on: ubuntu-latest
     steps:
-      - name: Verify APK is downloadable
+      - name: Verify APK landed on dist host
         env:
           VERSION: ${{ github.ref_name }}
         run: |
           VERSION="${VERSION#v}"
-          DOWNLOAD_URL="https://${{ env.DIST_DOMAIN }}/${{ inputs.app_slug }}/${{ inputs.app_slug }}-${VERSION}.apk"
-          echo "Verifying ${DOWNLOAD_URL}"
+          DEST_FILE="${{ inputs.app_slug }}-${VERSION}.apk"
+          DEST_PATH="/opt/app-dist/${{ inputs.app_slug }}/${DEST_FILE}"
 
-          HTTP_STATUS=$(curl -sf -o /dev/null -w '%{http_code}' "$DOWNLOAD_URL" || true)
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "APK not downloadable (HTTP ${HTTP_STATUS})"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PLATFORM_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+
+          # SSH-test-file-exists rather than HTTP-curl. The public URL is
+          # Pomerium-gated; unauthenticated GET returns a 302 to the auth
+          # flow, not 200, so the prior curl-for-200 check was structurally
+          # broken for any tenant behind Pomerium. SSH bypasses cleanly
+          # and reports size as a side-effect sanity check.
+          SIZE=$(ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=accept-new \
+            "deploy@${{ secrets.PLATFORM_IP }}" \
+            "stat -c %s '${DEST_PATH}' 2>/dev/null || echo 0")
+
+          rm -f ~/.ssh/id_deploy
+
+          if [ "${SIZE}" = "0" ]; then
+            echo "APK missing on dist host: ${DEST_PATH}"
             exit 1
           fi
-          echo "Verified: ${DOWNLOAD_URL}"
+          echo "Verified: ${DEST_PATH} (${SIZE} bytes)"
 
   register:
     needs: verify

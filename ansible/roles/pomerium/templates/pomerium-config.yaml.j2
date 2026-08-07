@@ -106,10 +106,19 @@ routes:
     allow_public_unauthenticated_access: true
 
   # ---- Tenant frontends (public-at-gateway; Phase 2 will gate per-tenant) ----
-{% for tenant in tenants if tenant.name != 'dungeon-master' %}
+{% for tenant in tenants if tenant.name != 'dungeon-master' and tenant.domain is defined %}
   - from: https://{{ tenant.domain }}
     to: http://frontend-{{ tenant.name }}:80
+{% if tenant.gated | default(false) %}
+    pass_identity_headers: true
+    policy:
+      - allow:
+          and:
+            - email:
+                is: jimjrasche@gmail.com
+{% else %}
     allow_public_unauthenticated_access: true
+{% endif %}
 {% endfor %}
 
   # ---- Gated routes (jimjrasche@gmail.com only) ----

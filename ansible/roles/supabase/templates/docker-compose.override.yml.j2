@@ -1,5 +1,5 @@
 services:
-{% for tenant in tenants if tenant.name != 'dungeon-master' %}
+{% for tenant in tenants if tenant.name != 'dungeon-master' and tenant.domain is defined %}
   frontend-{{ tenant.name }}:
     image: ghcr.io/jjrasche/{{ tenant.repo }}:latest
     restart: unless-stopped
@@ -102,7 +102,7 @@ services:
       - gatus
       - studio
       - static-jimr
-{% for tenant in tenants if tenant.name != 'dungeon-master' %}
+{% for tenant in tenants if tenant.name != 'dungeon-master' and tenant.domain is defined %}
       - frontend-{{ tenant.name }}
 {% endfor %}
     networks:

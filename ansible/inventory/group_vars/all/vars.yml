@@ -140,6 +140,7 @@ tenants:
     database: common_ground
     repo: common-ground
     gated: true
+    delivery: ssh
 
   # dungeon-master uses the shared `postgres` DB (per D13) for cross-schema
   # FKs to auth.users — no per-tenant database is created.

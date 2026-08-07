@@ -17,6 +17,14 @@ on:
         type: string
         default: "Dockerfile"
         description: "Dockerfile path relative to context"
+      delivery:
+        required: false
+        type: string
+        default: "registry"
+        description: "registry = GHCR push + VPS pull. ssh-load = docker save streamed
+          over the deploy SSH connection, no registry involved — keeps private repos'
+          images off any registry; pair with `delivery: ssh` on the platform tenant
+          stanza so the compose service carries pull_policy: never."
     secrets:
       VPS_SSH_KEY:
         required: true
@@ -25,6 +33,7 @@ on:
 
 jobs:
   build-and-push:
+    if: inputs.delivery == 'registry'
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
@@ -48,6 +57,7 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ github.sha }}
 
   deploy:
+    if: inputs.delivery == 'registry'
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
@@ -60,3 +70,32 @@ jobs:
             cd /opt/supabase/docker
             sudo docker compose pull frontend-${{ inputs.app_name }}
             sudo docker compose up -d --no-deps frontend-${{ inputs.app_name }}
+
+  build-ssh-load:
+    if: inputs.delivery == 'ssh-load'
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          push: false
+          load: true
+          tags: ghcr.io/${{ github.repository }}:latest
+
+      - name: Stream image over SSH and restart the service
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          docker save ghcr.io/${{ github.repository }}:latest \
+            | gzip \
+            | ssh -i ~/.ssh/deploy_key deploy@"$VPS_HOST" 'gunzip | sudo docker load'
+          ssh -i ~/.ssh/deploy_key deploy@"$VPS_HOST" \
+            'cd /opt/supabase/docker && sudo docker compose up -d --no-deps frontend-${{ inputs.app_name }}'

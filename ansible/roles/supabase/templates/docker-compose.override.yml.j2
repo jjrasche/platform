@@ -2,6 +2,9 @@ services:
 {% for tenant in tenants if tenant.name != 'dungeon-master' and tenant.domain is defined %}
   frontend-{{ tenant.name }}:
     image: ghcr.io/jjrasche/{{ tenant.repo }}:latest
+{% if tenant.delivery | default('registry') == 'ssh' %}
+    pull_policy: never
+{% endif %}
     restart: unless-stopped
     cap_drop:
       - ALL

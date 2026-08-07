@@ -113,9 +113,19 @@ routes:
     pass_identity_headers: true
     policy:
       - allow:
-          and:
+{% if tenant.allowed_emails is defined %}
+          or:
+{% for allowed_email in tenant.allowed_emails %}
             - email:
-                is: jimjrasche@gmail.com
+                is: {{ allowed_email }}
+{% endfor %}
+{% else %}
+          # Sign-in required, and signup is invite-only — so the account list IS
+          # the guest list. Granting access is one admin invite, never a deploy.
+          # Add `allowed_emails` to a tenant to narrow it further.
+          and:
+            - authenticated_user: true
+{% endif %}
 {% else %}
     allow_public_unauthenticated_access: true
 {% endif %}

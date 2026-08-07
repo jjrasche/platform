@@ -139,6 +139,8 @@ tenants:
     domain: land.jimr.fyi
     database: common_ground
     repo: common-ground
+    # gated -> any invited account may sign in (signup is invite-only, so the
+    # invite IS the grant). Add allowed_emails here only to narrow further.
     gated: true
     delivery: ssh
 

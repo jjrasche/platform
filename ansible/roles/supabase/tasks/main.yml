@@ -141,12 +141,16 @@
   when: (kong_jwks_route_added is defined and kong_jwks_route_added is changed)
         or (kong_oidc_routes_added is defined and kong_oidc_routes_added is changed)
 
+# Best-effort: every currently-pulled tenant image is public and ssh-load
+# tenants never pull, so a dead token must not block the converge.
 - name: Login to GHCR
   community.docker.docker_login:
     registry: ghcr.io
     username: jjrasche
     password: "{{ vault_ghcr_token }}"
   when: vault_ghcr_token is defined and vault_ghcr_token != "CHANGE_ME"
+  register: ghcr_login
+  failed_when: false
 
 # Render Pomerium + static-jimr configs BEFORE compose-up, otherwise
 # docker auto-creates the missing bind-mount sources as directories and
@@ -161,7 +165,10 @@
     project_src: "{{ supabase_dir }}/docker"
     state: present
     remove_orphans: true
-    pull: "{{ 'always' if (vault_ghcr_token is defined and vault_ghcr_token != 'CHANGE_ME') else 'missing' }}"
+    # 'missing', not 'always': tenant deploy jobs own image refresh; converge
+    # only fetches absent images, and ssh-load tenants (pull_policy: never)
+    # must never hit the registry here.
+    pull: missing
 
 # Restart pomerium / static-jimr HERE when their templates changed —
 # before the post-deploy verify gates. The pomerium role runs AFTER
@@ -492,7 +499,7 @@
         - "https://{{ item.domain }}/auth/callback"
       token_endpoint_auth_method: "none"
     status_code: [200, 201, 403, 409, 422]
-  loop: "{{ tenants }}"
+  loop: "{{ tenants | selectattr('domain', 'defined') | list }}"
   when: oauth_server_enabled
   register: oauth_clients
   changed_when: oauth_clients.status in [200, 201]

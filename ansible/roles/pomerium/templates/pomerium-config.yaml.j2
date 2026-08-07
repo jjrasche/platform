@@ -99,6 +99,17 @@ routes:
     prefix_rewrite: /portal/
     allow_public_unauthenticated_access: true
 
+{% if zitadel_enabled | default(false) %}
+  # ---- Zitadel (the IdP itself: must be public, or logging in loops) ----
+  # h2c upstream: Zitadel serves Connect-RPC/gRPC and needs cleartext HTTP/2.
+  # preserve_host_header: Zitadel matches its instance on Host — a rewritten Host
+  # returns "Instance not found" (404).
+  - from: https://{{ zitadel_domain }}
+    to: h2c://zitadel-zitadel-api-1:8080
+    allow_public_unauthenticated_access: true
+    preserve_host_header: true
+
+{% endif %}
   # ---- dm static client (public; auth happens client-side via GoTrue) ----
   - from: https://dm.jimr.fyi
     to: http://static-jimr

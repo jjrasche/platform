@@ -1,0 +1,59 @@
+# Zitadel — its own compose project with its own Postgres. Zitadel is event-sourced:
+# the database IS its durability story, so it must not share a failure domain with app
+# data. Ports bind to loopback only; Pomerium fronts it (h2c upstream for Connect-RPC).
+services:
+  zitadel-db:
+    image: postgres:17.10-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: zitadel
+      POSTGRES_PASSWORD: ${ZITADEL_DB_PASSWORD}
+      POSTGRES_DB: zitadel
+    volumes:
+      - zitadel_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zitadel -d zitadel"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  zitadel-api:
+    image: ghcr.io/zitadel/zitadel:v4.16.2
+    restart: unless-stopped
+    command: start-from-init --masterkey "${ZITADEL_MASTERKEY}" --tlsMode disabled
+    depends_on:
+      zitadel-db:
+        condition: service_healthy
+    environment:
+      ZITADEL_DATABASE_POSTGRES_HOST: zitadel-db
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: ${ZITADEL_DB_PASSWORD}
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: ${ZITADEL_DB_PASSWORD}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      ZITADEL_EXTERNALDOMAIN: ${ZITADEL_DOMAIN}
+      ZITADEL_EXTERNALPORT: ${ZITADEL_PORT}
+      ZITADEL_EXTERNALSECURE: ${ZITADEL_SECURE}
+      ZITADEL_TLS_ENABLED: "false"
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: ${ZITADEL_ADMIN_USER}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${ZITADEL_ADMIN_PASSWORD}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      - default
+      - supabase_frontend
+
+volumes:
+  zitadel_pgdata:
+
+# Pomerium lives in the supabase compose project; joining its frontend network is what
+# lets it reach this container by name. Declared here rather than attached by hand —
+# an imperative `docker network connect` is lost the next time the container recreates.
+networks:
+  default:
+  supabase_frontend:
+    external: true

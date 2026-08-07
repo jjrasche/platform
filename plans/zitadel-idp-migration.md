@@ -42,24 +42,42 @@ Rejected: `signInWithIdToken` (deprecated upstream, app must fetch the token its
 
 ## Phase 0 — settle the unknowns before anything moves
 
+**Status 2026-08-07: 0.1, 0.2, 0.3 PASS. 0.4 outstanding.** Zitadel v4.16.2 runs on the box as
+its own compose project (`/opt/zitadel`), fronted by Pomerium at `id.jimr.fyi` — `auth.jimr.fyi`
+was already the OIDC portal page. Two plan assumptions were corrected by running it: the shim
+needs no container of its own (Pomerium's `prefix_rewrite` can do the three path rewrites), and
+the compose network join must be *declared*, since an imperative `docker network connect` is lost
+on the next container recreate.
+
 Nothing in this phase touches a running service. Each is pass/fail.
 
-0.1 **Does Zitadel emit `email_verified` as a JSON boolean?** This single claim decides whether
+0.1 **PASS.** `zitadel/oidc` declares `type Bool bool` with a custom *un*marshaler only, so
+encoding emits a real JSON boolean; the live discovery doc advertises `email_verified` among 24
+claims (GoTrue advertises 8). GoTrue's `.(bool)` assertion will hold → verified users link →
+**UUIDs preserved → this is a config change, not a data migration.**
+Original question: **does Zitadel emit `email_verified` as a JSON boolean?** This single claim decides whether
 existing users keep their UUIDs. `keycloak.go` does `RawClaims["email_verified"].(bool)`; a JSON
 string `"true"` fails the assertion, silently becomes false, and forces new accounts. Decode a
 real ID token from the instance stood up in 1.1. **Fail → stop; the migration is a data
 migration, not a config change.**
 
-0.2 **Pomerium `h2c://` → Zitadel v4 Console.** Zitadel needs cleartext HTTP/2 upstream for
-Connect-RPC; Pomerium supports it via the `h2c://` scheme. Zitadel documents Traefik/NGINX/Caddy/
-httpd — not Pomerium — and neither issue tracker mentions the other, so this is untested in
-public. Load the Console through Pomerium, watch for failed `/zitadel.*.v2.*Service/*` calls.
+0.2 **PASS.** Pomerium `h2c://zitadel-zitadel-api-1:8080` with `preserve_host_header` serves
+discovery over the proxy and Zitadel derives `issuer: https://id.jimr.fyi` correctly. The
+combination is documented by neither project; it works. (A wrong Host returns 404 "instance not
+found" — observed directly before the header was preserved.)
 
-0.3 **Cloudflare orange-cloud vs Connect-RPC.** Same test through the proxied hostname.
-Fallback if it fails: grey-cloud the auth record.
+0.3 **PASS.** Through the proxied hostname: discovery 200, `/ui/console` 200, and a grpc-web
+`POST /zitadel.admin.v1.AdminService/Healthz` returns 200 over HTTP/1.1 — the orange cloud does
+not break Connect-RPC. No grey-cloud fallback needed.
 
-0.4 **The rewrite shim, end to end.** Three rewrites, then a federated sign-in with a throwaway
-account, then the SQL in 4.3. This is the riskiest unknown.
+0.4 **OUTSTANDING — the remaining unknown, and now the largest piece of work.** Three
+`prefix_rewrite` routes on a shim hostname mapping `/protocol/openid-connect/{auth,token,userinfo}`
+onto `/oauth/v2/authorize`, `/oauth/v2/token`, `/oidc/v1/userinfo`; then a federated sign-in with
+a throwaway account; then the SQL in 4.3. Prerequisite discovered while running Phase 0: creating
+the OIDC application needs Zitadel management-API access, which means either a headless Console
+login or re-initialising the instance with a bootstrap machine-user PAT
+(`ZITADEL_DEFAULTINSTANCE_ORG_MACHINE_MACHINE_USERNAME` + `..._PAT_EXPIRATIONDATE`, verified in
+`cmd/defaults.yaml`). Re-init is free while the instance holds no real identities.
 
 ## Phase 1 — Zitadel up, nothing switched
 

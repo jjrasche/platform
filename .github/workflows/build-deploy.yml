@@ -12,6 +12,11 @@ on:
         type: string
         default: "."
         description: "Docker build context path"
+      dockerfile:
+        required: false
+        type: string
+        default: "Dockerfile"
+        description: "Dockerfile path relative to context"
     secrets:
       VPS_SSH_KEY:
         required: true
@@ -36,6 +41,7 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:latest

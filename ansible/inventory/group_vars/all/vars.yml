@@ -132,6 +132,13 @@ tenants:
     apps:
       - slug: agentplatform
 
+  # common-ground: static map frontend (land analysis). Database reserved for
+  # the PostGIS stage; the container is fully static today.
+  - name: common-ground
+    domain: land.jimr.fyi
+    database: common_ground
+    repo: common-ground
+
   # dungeon-master uses the shared `postgres` DB (per D13) for cross-schema
   # FKs to auth.users — no per-tenant database is created.
   # The container itself self-deploys via dungeon-master's GitHub Actions

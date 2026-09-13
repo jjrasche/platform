@@ -116,6 +116,12 @@ routes:
     prefix_rewrite: /dm/
     allow_public_unauthenticated_access: true
 
+  # ---- sideline signup page (public static, served like dm) ----
+  - from: https://sideline.practice.exchange
+    to: http://static-jimr
+    prefix_rewrite: /sideline/
+    allow_public_unauthenticated_access: true
+
   # ---- Tenant frontends (public-at-gateway; Phase 2 will gate per-tenant) ----
 {% for tenant in tenants if tenant.name != 'dungeon-master' and tenant.domain is defined %}
   - from: https://{{ tenant.domain }}

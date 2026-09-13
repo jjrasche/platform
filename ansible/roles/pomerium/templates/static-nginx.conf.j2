@@ -35,6 +35,16 @@ http {
       }
     }
 
+    # sideline.practice.exchange signup page. config.js carries the anon key; never cache it.
+    location /sideline/ {
+      alias /srv/sideline/;
+      try_files $uri $uri/ /sideline/index.html;
+      location = /sideline/config.js {
+        alias /srv/sideline/config.js;
+        add_header Cache-Control "no-cache, must-revalidate" always;
+      }
+    }
+
     # auth.jimr.fyi static portal. Apply no-cache to ALL portal assets — the
     # prior Caddy block had a comment explaining file_server's defaults
     # (max-age=14400) override block-level headers; nginx is strict here.

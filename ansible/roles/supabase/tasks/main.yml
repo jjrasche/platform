@@ -69,6 +69,32 @@
     owner: deploy
     group: deploy
 
+# sideline signup page: static files come straight from the sideline repo
+# checkout next to this one; platform templates only the anon-key config.
+- name: Ensure sideline static dir exists
+  file:
+    path: /var/www/sideline
+    state: directory
+    mode: "0755"
+    owner: deploy
+    group: deploy
+
+- name: Copy sideline web files
+  copy:
+    src: "{{ playbook_dir }}/../../sideline/web/"
+    dest: /var/www/sideline/
+    mode: "0644"
+    owner: deploy
+    group: deploy
+
+- name: Template sideline config.js
+  template:
+    src: sideline-config.js.j2
+    dest: /var/www/sideline/config.js
+    mode: "0644"
+    owner: deploy
+    group: deploy
+
 - name: Check if JWKS route exists in Kong config
   command: grep -q 'auth-v1-open-jwks' "{{ supabase_dir }}/docker/volumes/api/kong.yml"
   register: jwks_route_check

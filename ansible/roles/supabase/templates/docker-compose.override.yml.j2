@@ -132,6 +132,7 @@ services:
       - ./volumes/static-jimr/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./volumes/static-jimr/oidc:/srv/oidc:ro
       - /var/www/dungeon-master:/srv/dm:ro
+      - /var/www/sideline:/srv/sideline:ro
       - /opt/auth-portal:/srv/portal:ro
       - /opt/app-dist:/srv/apps:ro
     networks:

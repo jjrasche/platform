@@ -52,7 +52,9 @@ pathDefaults:
   recordPath: /recordings/%path/%Y-%m-%d_%H-%M-%S-%f
   recordFormat: fmp4
   recordSegmentDuration: 1h
-  recordDeleteAfter: 168h
+  # Two 1080p streams write ~3 GiB/h; the box has ~15 GiB of headroom. 48 h
+  # holds one game's footage until it is clipped or pulled off-box.
+  recordDeleteAfter: 48h
 
 paths:
   ~^cam[0-9]+$:

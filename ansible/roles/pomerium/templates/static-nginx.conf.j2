@@ -14,9 +14,11 @@ http {
   sendfile on;
   keepalive_timeout 65;
 
-  # WASM mime — dm's Kotlin/wasm bundle 404s without this.
+  # WASM mime — dm's Kotlin/wasm bundle 404s without this. Chrome refuses to
+  # install a PWA whose manifest is not served as manifest+json.
   types {
     application/wasm wasm;
+    application/manifest+json webmanifest;
   }
 
   server {

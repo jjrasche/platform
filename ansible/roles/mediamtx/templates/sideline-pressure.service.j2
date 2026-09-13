@@ -1,0 +1,9 @@
+[Unit]
+Description=Sweep recordings early when the disk is under {{ mediamtx_disk_floor_gb }} GiB free
+After=docker.service
+
+[Service]
+Type=oneshot
+User=deploy
+Environment=RCLONE_CONFIG={{ mediamtx_dir }}/rclone.conf
+ExecStart=/bin/bash {{ mediamtx_dir }}/pressure.sh {{ mediamtx_dir }}/recordings r2:sideline-recordings/recordings {{ mediamtx_disk_floor_gb }}

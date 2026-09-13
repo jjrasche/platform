@@ -82,7 +82,7 @@
     src: "{{ playbook_dir }}/../../sideline/scripts/archive/{{ item }}"
     dest: "{{ mediamtx_dir }}/{{ item }}"
     mode: "0755"
-  loop: [sweep.sh, restore.sh]
+  loop: [sweep.sh, restore.sh, pressure.sh]
 
 - name: Recordings dir and existing files belong to the sweep user
   file:
@@ -98,16 +98,17 @@
     src: "{{ item }}.j2"
     dest: "/etc/systemd/system/{{ item }}"
     mode: "0644"
-  loop: [sideline-archive.service, sideline-archive.timer]
+  loop: [sideline-archive.service, sideline-archive.timer, sideline-pressure.service, sideline-pressure.timer]
   register: archive_units
   when: vault_r2_access_key_id is defined
 
-- name: Enable the hourly archive timer
+- name: Enable the archive timers
   systemd:
-    name: sideline-archive.timer
+    name: "{{ item }}"
     enabled: true
     state: started
     daemon_reload: "{{ archive_units is changed }}"
+  loop: [sideline-archive.timer, sideline-pressure.timer]
   when: vault_r2_access_key_id is defined
 
 - name: Verify the sweep user can list the R2 bucket (post-deploy gate)

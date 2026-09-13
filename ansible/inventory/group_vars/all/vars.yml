@@ -76,6 +76,8 @@ tenant_dev_db_access:
 
 # MediaMTX live-stream ingest for sideline (practice.exchange)
 mediamtx_dir: /opt/mediamtx
+# Below this much free space the pressure timer archives anything older than 2 h.
+mediamtx_disk_floor_gb: 12
 
 # Luanti game server
 luanti_dir: /opt/luanti

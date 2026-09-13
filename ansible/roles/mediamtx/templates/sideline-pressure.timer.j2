@@ -1,0 +1,9 @@
+[Unit]
+Description=Every 10 minutes: archive early if the disk is under the floor
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+
+[Install]
+WantedBy=timers.target

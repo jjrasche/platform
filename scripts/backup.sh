@@ -57,4 +57,18 @@ done
 # Prune backups older than 30 days (both encrypted and any pre-cutover plaintext)
 find "${BACKUP_DIR}" -maxdepth 1 -name '*.sql.gz' -mtime +30 -delete
 find "${BACKUP_DIR}" -maxdepth 1 -name '*.sql.gz.gpg' -mtime +30 -delete
+# Off-site copy: encrypted dumps to Cloudflare R2 under backups/, using the
+# rclone config the mediamtx role templates. Local backups already exist by
+# this point, so a failed upload is loud but does not undo the night's work.
+RCLONE_CONF="/opt/mediamtx/rclone.conf"
+if [ -f "${RCLONE_CONF}" ] && command -v rclone >/dev/null 2>&1; then
+  if rclone --config "${RCLONE_CONF}" --contimeout 10s --timeout 120s --retries 1        copy "${BACKUP_DIR}" r2:sideline-recordings/backups --include '*.sql.gz.gpg'; then
+    echo "[$(date)] Off-site copy to R2 complete."
+  else
+    echo "[$(date)] ERROR: off-site copy to R2 failed; local backups are intact." >&2
+  fi
+else
+  echo "[$(date)] WARNING: no rclone config at ${RCLONE_CONF}; backups stayed local only." >&2
+fi
+
 echo "[$(date)] Backup complete."

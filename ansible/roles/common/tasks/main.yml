@@ -44,7 +44,7 @@
 # break decryption.
 - name: Install pinned gnupg for backup encryption
   apt:
-    name: "gnupg=2.4.4-2ubuntu17.4"
+    name: "gnupg=2.4.4-2ubuntu17.6"
     state: present
     allow_downgrade: true
 

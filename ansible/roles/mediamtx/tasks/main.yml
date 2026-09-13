@@ -55,3 +55,61 @@
   retries: 5
   delay: 3
   until: mediamtx_paths.rc == 0
+
+# Archive: recordings older than 48 h go to Cloudflare R2, then leave the disk.
+# The sweep and restore scripts are proven in the sideline repo's harness.
+- name: Install rclone from Ubuntu's repo
+  apt:
+    name: rclone
+    state: present
+    update_cache: true
+  when: vault_r2_access_key_id is defined
+
+- name: Template rclone.conf for R2
+  template:
+    src: rclone.conf.j2
+    dest: "{{ mediamtx_dir }}/rclone.conf"
+    mode: "0600"
+    owner: deploy
+    group: deploy
+  no_log: true
+  when: vault_r2_access_key_id is defined
+
+- name: Copy the archive scripts from the sideline repo
+  copy:
+    src: "{{ playbook_dir }}/../../sideline/scripts/archive/{{ item }}"
+    dest: "{{ mediamtx_dir }}/{{ item }}"
+    mode: "0755"
+  loop: [sweep.sh, restore.sh]
+
+- name: Recordings dir is writable by the sweep user
+  file:
+    path: "{{ mediamtx_dir }}/recordings"
+    state: directory
+    owner: deploy
+    group: deploy
+    mode: "0775"
+
+- name: Install the archive service and timer
+  template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    mode: "0644"
+  loop: [sideline-archive.service, sideline-archive.timer]
+  register: archive_units
+  when: vault_r2_access_key_id is defined
+
+- name: Enable the hourly archive timer
+  systemd:
+    name: sideline-archive.timer
+    enabled: true
+    state: started
+    daemon_reload: "{{ archive_units is changed }}"
+  when: vault_r2_access_key_id is defined
+
+- name: Verify the sweep user can list the R2 bucket (post-deploy gate)
+  become: true
+  become_user: deploy
+  command: rclone --config {{ mediamtx_dir }}/rclone.conf lsd r2:sideline-recordings
+  changed_when: false
+  when: vault_r2_access_key_id is defined

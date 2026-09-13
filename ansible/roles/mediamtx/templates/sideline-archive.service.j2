@@ -1,0 +1,9 @@
+[Unit]
+Description=Move MediaMTX recordings older than 48 h to R2, then delete locally
+After=docker.service
+
+[Service]
+Type=oneshot
+User=deploy
+Environment=RCLONE_CONFIG={{ mediamtx_dir }}/rclone.conf
+ExecStart=/bin/bash {{ mediamtx_dir }}/sweep.sh {{ mediamtx_dir }}/recordings r2:sideline-recordings/recordings 48

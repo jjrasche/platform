@@ -1,0 +1,10 @@
+# Rendered by Ansible. Cloudflare R2, bucket sideline-recordings. Read by
+# sideline-archive.service as user deploy.
+[r2]
+type = s3
+provider = Cloudflare
+access_key_id = {{ vault_r2_access_key_id }}
+secret_access_key = {{ vault_r2_secret_access_key }}
+endpoint = https://{{ vault_r2_account_id }}.r2.cloudflarestorage.com
+acl = private
+no_check_bucket = true

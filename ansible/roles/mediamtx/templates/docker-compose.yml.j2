@@ -1,0 +1,24 @@
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:1.21.0
+    container_name: mediamtx
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    ports:
+      - "1935:1935"
+    volumes:
+      - {{ mediamtx_dir }}/mediamtx.yml:/mediamtx.yml:ro
+      - {{ mediamtx_dir }}/recordings:/recordings
+    networks:
+      - default
+      - supabase_frontend
+
+networks:
+  supabase_frontend:
+    external: true

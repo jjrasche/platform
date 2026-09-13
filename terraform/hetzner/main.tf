@@ -118,6 +118,15 @@ resource "hcloud_firewall" "platform" {
     port       = "30000"
     source_ips = ["0.0.0.0/0", "::/0"]
   }
+
+  # RTMP ingest for MediaMTX. Cloudflare cannot proxy RTMP, so phones push
+  # straight to the VPS; MediaMTX requires the publish password.
+  rule {
+    direction  = "in"
+    protocol   = "tcp"
+    port       = "1935"
+    source_ips = ["0.0.0.0/0", "::/0"]
+  }
 }
 
 resource "hcloud_server" "platform" {

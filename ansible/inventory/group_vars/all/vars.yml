@@ -74,6 +74,9 @@ tenant_dev_db_access:
     db_role: dm_seeder
     schemas: [dm]
 
+# MediaMTX live-stream ingest for sideline (practice.exchange)
+mediamtx_dir: /opt/mediamtx
+
 # Luanti game server
 luanti_dir: /opt/luanti
 luanti_image_tag: "5.16.0"

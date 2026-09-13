@@ -31,4 +31,5 @@
     - { role: pomerium, tags: [pomerium] }
     - { role: app-distribution, tags: [app-distribution] }
     - { role: luanti, tags: [luanti] }
+    - { role: mediamtx, tags: [mediamtx] }
 

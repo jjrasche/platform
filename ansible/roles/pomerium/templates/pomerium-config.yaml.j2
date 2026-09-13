@@ -116,6 +116,11 @@ routes:
     prefix_rewrite: /dm/
     allow_public_unauthenticated_access: true
 
+  # ---- sideline live HLS (MediaMTX, public read; publish is RTMP on 1935 direct) ----
+  - from: https://stream.practice.exchange
+    to: http://mediamtx:8888
+    allow_public_unauthenticated_access: true
+
   # ---- sideline signup page (public static, served like dm) ----
   - from: https://sideline.practice.exchange
     to: http://static-jimr

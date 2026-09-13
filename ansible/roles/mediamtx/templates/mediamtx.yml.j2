@@ -1,0 +1,58 @@
+# Rendered by Ansible. Phones push RTMP with the vault publish password;
+# anyone can read HLS through Pomerium at stream.practice.exchange.
+logLevel: info
+logDestinations: [stdout]
+
+api: yes
+apiAddress: :9997
+metrics: yes
+metricsAddress: :9998
+
+authMethod: internal
+authInternalUsers:
+  - user: cam
+    pass: {{ vault_mediamtx_publish_pass }}
+    ips: []
+    permissions:
+      - action: publish
+        path:
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: read
+        path:
+      - action: playback
+        path:
+  # API and metrics ports are never published to the host; only containers on
+  # the compose networks can reach them.
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: api
+      - action: metrics
+
+rtmp: yes
+rtmpAddress: :1935
+rtsp: no
+srt: no
+webrtc: no
+moq: no
+
+hls: yes
+hlsAddress: :8888
+hlsAlwaysRemux: yes
+hlsVariant: lowLatency
+hlsSegmentDuration: 1s
+hlsAllowOrigins: ["*"]
+
+pathDefaults:
+  record: yes
+  recordPath: /recordings/%path/%Y-%m-%d_%H-%M-%S-%f
+  recordFormat: fmp4
+  recordSegmentDuration: 1h
+  recordDeleteAfter: 168h
+
+paths:
+  ~^cam[0-9]+$:

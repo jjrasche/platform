@@ -1,0 +1,57 @@
+---
+# MediaMTX: RTMP in from phones (port 1935, direct to the VPS — Cloudflare
+# does not proxy RTMP), HLS out through Pomerium on stream.practice.exchange.
+# Joins the supabase compose project's frontend network so Pomerium can
+# reach it by container name.
+
+- name: Create MediaMTX directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ mediamtx_dir }}"
+    - "{{ mediamtx_dir }}/recordings"
+
+- name: Template MediaMTX config
+  template:
+    src: mediamtx.yml.j2
+    dest: "{{ mediamtx_dir }}/mediamtx.yml"
+    mode: "0640"
+  register: mediamtx_config
+  no_log: true
+
+- name: Copy the stream sampler from the sideline repo
+  copy:
+    src: "{{ playbook_dir }}/../../sideline/scripts/stream-stats.sh"
+    dest: "{{ mediamtx_dir }}/stream-stats.sh"
+    mode: "0755"
+
+- name: Template docker-compose for MediaMTX
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ mediamtx_dir }}/docker-compose.yml"
+    mode: "0644"
+  register: mediamtx_compose
+
+- name: Start MediaMTX
+  community.docker.docker_compose_v2:
+    project_src: "{{ mediamtx_dir }}"
+    state: present
+    pull: missing
+
+- name: Restart MediaMTX if config changed
+  community.docker.docker_compose_v2:
+    project_src: "{{ mediamtx_dir }}"
+    state: restarted
+  when: mediamtx_compose is changed or mediamtx_config is changed
+
+# The mediamtx image is scratch-based (no shell, no wget); probe it from the
+# nginx sidecar that shares the frontend network.
+- name: Verify MediaMTX API answers (post-deploy gate)
+  shell: docker exec supabase-static-jimr-1 wget -qO- http://mediamtx:9997/v3/paths/list
+  register: mediamtx_paths
+  changed_when: false
+  retries: 5
+  delay: 3
+  until: mediamtx_paths.rc == 0

@@ -18,6 +18,8 @@
     src: mediamtx.yml.j2
     dest: "{{ mediamtx_dir }}/mediamtx.yml"
     mode: "0640"
+    owner: deploy
+    group: deploy
   register: mediamtx_config
   no_log: true
 
@@ -82,13 +84,14 @@
     mode: "0755"
   loop: [sweep.sh, restore.sh]
 
-- name: Recordings dir is writable by the sweep user
+- name: Recordings dir and existing files belong to the sweep user
   file:
     path: "{{ mediamtx_dir }}/recordings"
     state: directory
     owner: deploy
     group: deploy
     mode: "0775"
+    recurse: true
 
 - name: Install the archive service and timer
   template:

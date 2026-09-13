@@ -2,6 +2,8 @@ services:
   mediamtx:
     image: bluenviron/mediamtx:1.21.0
     container_name: mediamtx
+    # Run as deploy so recordings are deletable by the archive sweep.
+    user: "1000:1000"
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true

@@ -62,7 +62,7 @@ find "${BACKUP_DIR}" -maxdepth 1 -name '*.sql.gz.gpg' -mtime +30 -delete
 # this point, so a failed upload is loud but does not undo the night's work.
 RCLONE_CONF="/opt/mediamtx/rclone.conf"
 if [ -f "${RCLONE_CONF}" ] && command -v rclone >/dev/null 2>&1; then
-  if rclone --config "${RCLONE_CONF}" --contimeout 10s --timeout 120s --retries 1 copy "${BACKUP_DIR}" r2:sideline-recordings/backups --include '*.sql.gz.gpg' --max-depth 1; then
+  if rclone --config "${RCLONE_CONF}" --contimeout 10s --timeout 120s --retries 1 --no-update-modtime copy "${BACKUP_DIR}" r2:sideline-recordings/backups --include '*.sql.gz.gpg' --max-depth 1; then
     echo "[$(date)] Off-site copy to R2 complete."
   else
     echo "[$(date)] ERROR: off-site copy to R2 failed; local backups are intact." >&2

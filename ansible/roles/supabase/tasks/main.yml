@@ -407,11 +407,12 @@
 
 # sideline reactions operator: the admin page proves itself with a token whose
 # sha256 sits in reaction_admin. Only the hash crosses the wire here.
-- name: Register the sideline reactions operator token hash
+- name: Register the sideline reactions operator token hashes
   shell: |
-    HASH=$(printf '%s' '{{ vault_reactions_admin_token }}' | sha256sum | cut -d' ' -f1)
+    HASH=$(printf '%s' '{{ item }}' | sha256sum | cut -d' ' -f1)
     docker exec -i supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 \
       -c "insert into public.reaction_admin (token_hash) values ('$HASH') on conflict do nothing"
+  loop: "{{ [vault_reactions_admin_token, vault_reactions_admin_token_2] | select('defined') | list }}"
   register: reactions_admin_upsert
   changed_when: "'INSERT 0 1' in reactions_admin_upsert.stdout"
   no_log: true

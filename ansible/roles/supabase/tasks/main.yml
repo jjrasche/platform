@@ -405,6 +405,18 @@
   # in the dungeon-master repo — fix lives there, not here.
   ignore_errors: true
 
+# sideline reactions operator: the admin page proves itself with a token whose
+# sha256 sits in reaction_admin. Only the hash crosses the wire here.
+- name: Register the sideline reactions operator token hash
+  shell: |
+    HASH=$(printf '%s' '{{ vault_reactions_admin_token }}' | sha256sum | cut -d' ' -f1)
+    docker exec -i supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 \
+      -c "insert into public.reaction_admin (token_hash) values ('$HASH') on conflict do nothing"
+  register: reactions_admin_upsert
+  changed_when: "'INSERT 0 1' in reactions_admin_upsert.stdout"
+  no_log: true
+  when: vault_reactions_admin_token is defined
+
 # Tenant developer DB access — port-forward-only SSH user + scoped Postgres
 # role per tenant. Driven by `tenant_dev_db_access` in vars.yml. Each entry
 # expects two vault vars by deterministic name:

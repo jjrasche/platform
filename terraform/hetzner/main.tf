@@ -119,6 +119,16 @@ resource "hcloud_firewall" "platform" {
     source_ips = ["0.0.0.0/0", "::/0"]
   }
 
+  # WireGuard mesh (wg0 on the box, 10.0.0.0/24). Peers behind NAT — the phone, the laptop —
+  # can only ever initiate, so the port must be open inbound; WireGuard answers nothing to an
+  # unknown key. Before this rule, a peer handshook only when the box initiated to it.
+  rule {
+    direction  = "in"
+    protocol   = "udp"
+    port       = "51820"
+    source_ips = ["0.0.0.0/0", "::/0"]
+  }
+
   # RTMP ingest for MediaMTX. Cloudflare cannot proxy RTMP, so phones push
   # straight to the VPS; MediaMTX requires the publish password.
   rule {

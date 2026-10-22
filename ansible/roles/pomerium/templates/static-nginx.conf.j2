@@ -77,13 +77,6 @@ http {
       default_type application/json;
       add_header Cache-Control "public, max-age=300";
     }
-    # Answer for a hostname whose app is not deployed yet (book.jimr.fyi's placeholder upstream).
-    location /reserved/ {
-      default_type text/plain;
-      add_header Cache-Control "no-store" always;
-      return 503 "This hostname is reserved; its app is not deployed yet.\n";
-    }
-
     location = /oidc/.well-known/openid-configuration {
       alias /srv/oidc/openid-configuration.json;
       default_type application/json;

@@ -189,3 +189,22 @@ routes:
           and:
             - email:
                 is: jimjrasche@gmail.com
+
+  # page-worlds, a host systemd unit (not a container). 172.17.0.1 is docker0, Docker's
+  # host-gateway address: Pomerium's bridge networks reach it; the tailnet and internet do not.
+  - from: https://plum.jimr.fyi
+    to: http://172.17.0.1:8090
+    policy:
+      - allow:
+          and:
+            - email:
+                is: jimjrasche@gmail.com
+
+  # PLACEHOLDER upstream: the book app is not on this box yet. Replace this `to:` with its port.
+  - from: https://book.jimr.fyi
+    to: http://static-jimr/reserved/
+    policy:
+      - allow:
+          and:
+            - email:
+                is: jimjrasche@gmail.com

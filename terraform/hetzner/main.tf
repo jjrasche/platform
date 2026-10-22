@@ -199,6 +199,26 @@ resource "cloudflare_record" "authenticate" {
   ttl     = 1
 }
 
+# --- Pomerium-gated hosts (jimjrasche@gmail.com only; the route is in pomerium-config.yaml.j2) ---
+
+resource "cloudflare_record" "plum" {
+  zone_id = var.cloudflare_zone_id
+  name    = "plum"
+  content = hcloud_server.platform.ipv4_address
+  type    = "A"
+  proxied = true
+  ttl     = 1
+}
+
+resource "cloudflare_record" "book" {
+  zone_id = var.cloudflare_zone_id
+  name    = "book"
+  content = hcloud_server.platform.ipv4_address
+  type    = "A"
+  proxied = true
+  ttl     = 1
+}
+
 # --- Luanti game server DNS (UDP — cannot be proxied) ---
 
 resource "cloudflare_record" "play" {

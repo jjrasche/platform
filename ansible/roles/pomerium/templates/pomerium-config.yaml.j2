@@ -127,6 +127,22 @@ routes:
     prefix_rewrite: /sideline/
     allow_public_unauthenticated_access: true
 
+  # ---- land map favorites API: signed-in only, owner = the email Pomerium signs into
+  # X-Pomerium-Jwt-Assertion; the favorites Edge Function verifies it. Before the tenant
+  # loop so this prefix wins over the tenant's catch-all route on the same host. ----
+  - from: https://land.jimr.fyi
+    prefix: /api/favorites
+    to: http://kong:8000
+    prefix_rewrite: /functions/v1/favorites
+    pass_identity_headers: true
+    set_request_headers:
+      apikey: "{{ vault_anon_key }}"
+      Authorization: "Bearer {{ vault_anon_key }}"
+    policy:
+      - allow:
+          and:
+            - authenticated_user: true
+
   # ---- Tenant frontends (public-at-gateway; Phase 2 will gate per-tenant) ----
 {% for tenant in tenants if tenant.name != 'dungeon-master' and tenant.domain is defined %}
   - from: https://{{ tenant.domain }}

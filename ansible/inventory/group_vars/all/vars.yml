@@ -50,6 +50,7 @@ ci_deploy_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPMpe8/hgmlj+2Nlvymf8
 # crashes on first request.
 tenant_edge_functions:
   - { repo: dungeon-master, function: turn }
+  - { repo: common-ground, function: favorites }
 
 # Tenant repos whose supabase/migrations/*.sql land on the shared Postgres
 # via the Ansible role. Replaces the tenant-side deploy.yml psql apply path.
@@ -57,6 +58,7 @@ tenant_edge_functions:
 tenant_db_repos:
   - dungeon-master
   - sideline
+  - common-ground
 
 # Per-tenant developer DB access for regression suites and fixture work.
 # Each entry creates: a port-forward-only SSH user on VPS1, and a scoped

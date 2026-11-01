@@ -224,6 +224,14 @@ routes:
             - email:
                 is: jimjrasche@gmail.com
 
+  - from: https://flow.jimr.fyi
+    to: http://172.17.0.1:8095
+    policy:
+      - allow:
+          and:
+            - email:
+                is: jimjrasche@gmail.com
+
   - from: https://climate.jimr.fyi
     to: http://172.17.0.1:8092
     policy:
